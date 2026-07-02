@@ -219,21 +219,17 @@ app.post('/login', (req, res) => {
 });
 
 app.get('/dashboard', (req, res) => {
-	const queryToken = req.query.u || req.query.user || null;
-	let user = 'User';
-	let token = null;
-	if (queryToken) {
-		// If queryToken is an encrypted token, try decrypting
-		const maybeUser = decryptUserToken(queryToken);
-		if (maybeUser) {
-			user = maybeUser;
-			token = queryToken;
-		} else {
-			// treat as legacy plaintext username
-			user = queryToken;
-			token = encryptUserToken(user);
-		}
+	const queryToken = req.query.u || null;
+	if (!queryToken) {
+		return res.redirect('/');
 	}
+
+	const user = decryptUserToken(queryToken);
+	if (!user) {
+		return res.redirect('/');
+	}
+
+	const token = queryToken;
 	const error = req.query.error || null;
 	const message = req.query.message || null;
 	const userData = loadUserClasses(user);
@@ -243,16 +239,11 @@ app.get('/dashboard', (req, res) => {
 
 app.post('/dashboard/action', (req, res) => {
 	const { u, action, classId, taskId, className, bgColor, textColor, textBgColor, taskTitle, taskDeadline, taskDescription, currentPassword, newPassword, confirmPassword } = req.body;
-	// Accept either encrypted token `u` or legacy plaintext `user` in body
 	let user = null;
 	let token = null;
 	if (u) {
 		user = decryptUserToken(u);
 		token = u;
-	}
-	if (!user && req.body.user) {
-		user = req.body.user;
-		token = encryptUserToken(user);
 	}
 	if (!user) return res.redirect('/');
 
