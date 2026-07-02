@@ -2,6 +2,42 @@
   "Dingleton": {
     "classes": [
       {
+        "id": "ea0c60e4637bf4c1",
+        "name": "C327 Software App Development",
+        "bgColor": "#ff6673",
+        "textColor": "#fec8c8",
+        "textBgColor": "#883f3f",
+        "tasks": [
+          {
+            "id": "4fb6254671cba48e",
+            "title": "Thrusday Class",
+            "deadline": "2026-07-02",
+            "description": "You didnt do today's class please get it done"
+          }
+        ]
+      },
+      {
+        "id": "1a7bcf01522e0164",
+        "name": "C229 Operating Systems and Cloud Computing",
+        "bgColor": "#ffe78f",
+        "textColor": "#8a5e00",
+        "textBgColor": "#ffc038",
+        "tasks": [
+          {
+            "id": "89c82cf136e8dcbd",
+            "title": "Worksheet",
+            "deadline": "2026-07-03",
+            "description": ""
+          },
+          {
+            "id": "e9d16c400ff420cc",
+            "title": "PDT Week 8",
+            "deadline": "2026-07-03",
+            "description": "Every week is done in the same pdt document"
+          }
+        ]
+      },
+      {
         "id": "af9b26f3828aba3c",
         "name": "C330 Linux Administration",
         "bgColor": "#cfa8ff",
@@ -35,27 +71,6 @@
         ]
       },
       {
-        "id": "1a7bcf01522e0164",
-        "name": "C229 Operating Systems and Cloud Computing",
-        "bgColor": "#ffe78f",
-        "textColor": "#8a5e00",
-        "textBgColor": "#ffc038",
-        "tasks": [
-          {
-            "id": "89c82cf136e8dcbd",
-            "title": "Worksheet",
-            "deadline": "2026-07-03",
-            "description": ""
-          },
-          {
-            "id": "e9d16c400ff420cc",
-            "title": "PDT Week 8",
-            "deadline": "2026-07-03",
-            "description": "Every week is done in the same pdt document"
-          }
-        ]
-      },
-      {
         "id": "984c5dcbd1d34b35",
         "name": "C328 Intelligent Networks",
         "bgColor": "#24bdff",
@@ -82,14 +97,6 @@
         "bgColor": "#b4cdb1",
         "textColor": "#e5fff3",
         "textBgColor": "#56715a",
-        "tasks": []
-      },
-      {
-        "id": "ea0c60e4637bf4c1",
-        "name": "C327 Software App Development",
-        "bgColor": "#ff6673",
-        "textColor": "#fec8c8",
-        "textBgColor": "#883f3f",
         "tasks": []
       },
       {
