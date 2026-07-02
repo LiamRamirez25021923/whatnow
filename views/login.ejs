@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WhatNow — Login</title>
+    <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="brand">WhatNow<span class="q">?</span></header>
+
+      <section class="card login-card">
+        <h2 class="card-title">Login</h2>
+        <% if (error) { %>
+          <div class="error"><%= error %></div>
+        <% } %>
+        <form action="/login" method="post" class="login-form">
+          <input name="username" placeholder="Username" value="<%= username %>" class="text-input" />
+          <input name="password" type="password" placeholder="Password" class="text-input" />
+          <button class="btn" type="submit">Log in</button>
+        </form>
+        <p style="margin-top:12px">Don't have an account? <a href="/register">Create one</a></p>
+      </section>
+    </main>
+  </body>
+</html>

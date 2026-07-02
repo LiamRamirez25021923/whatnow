@@ -1,0 +1,113 @@
+{
+  "Dingleton": {
+    "classes": [
+      {
+        "id": "af9b26f3828aba3c",
+        "name": "C330 Linux Administration",
+        "bgColor": "#cfa8ff",
+        "textColor": "#fee1fd",
+        "textBgColor": "#8f67a2",
+        "tasks": [
+          {
+            "id": "2d7ef5c0686e08b0",
+            "title": "Lesson 15",
+            "deadline": "2026-07-01",
+            "description": "Finish today's worksheet and please do try understand what it is"
+          },
+          {
+            "id": "3612419491a154a5",
+            "title": "Draft the \"Planned Next Steps\" slide (deferred objectives",
+            "deadline": "",
+            "description": ""
+          },
+          {
+            "id": "e54c8a575cc4a5df",
+            "title": "Maintain the lesson-completion table and test/verify others' steps",
+            "deadline": "",
+            "description": ""
+          },
+          {
+            "id": "512e4caf4042f7b4",
+            "title": "Gather and consolidate all screenshots into the deck",
+            "deadline": "",
+            "description": ""
+          }
+        ]
+      },
+      {
+        "id": "1a7bcf01522e0164",
+        "name": "C229 Operating Systems and Cloud Computing",
+        "bgColor": "#ffe78f",
+        "textColor": "#8a5e00",
+        "textBgColor": "#ffc038",
+        "tasks": [
+          {
+            "id": "89c82cf136e8dcbd",
+            "title": "Worksheet",
+            "deadline": "2026-07-03",
+            "description": ""
+          },
+          {
+            "id": "e9d16c400ff420cc",
+            "title": "PDT Week 8",
+            "deadline": "2026-07-03",
+            "description": "Every week is done in the same pdt document"
+          }
+        ]
+      },
+      {
+        "id": "984c5dcbd1d34b35",
+        "name": "C328 Intelligent Networks",
+        "bgColor": "#24bdff",
+        "textColor": "#d2effe",
+        "textBgColor": "#033e7c",
+        "tasks": [
+          {
+            "id": "86def0051b7861bd",
+            "title": "Tuesday E Learning",
+            "deadline": "2026-07-03",
+            "description": ""
+          },
+          {
+            "id": "bd417dd3267a50dd",
+            "title": "Do complete the Worksheets from week 2 to week 7",
+            "deadline": "2026-06-18",
+            "description": ""
+          }
+        ]
+      },
+      {
+        "id": "b04b5c9c32d1329d",
+        "name": "C270 Devops",
+        "bgColor": "#b4cdb1",
+        "textColor": "#e5fff3",
+        "textBgColor": "#56715a",
+        "tasks": []
+      },
+      {
+        "id": "ea0c60e4637bf4c1",
+        "name": "C327 Software App Development",
+        "bgColor": "#ff6673",
+        "textColor": "#fec8c8",
+        "textBgColor": "#883f3f",
+        "tasks": []
+      },
+      {
+        "id": "588f0e01042f39a2",
+        "name": "CA1s",
+        "bgColor": "#186890",
+        "textColor": "#ffdd00",
+        "textBgColor": "#0f3f57",
+        "tasks": []
+      },
+      {
+        "id": "4576f821621dc16a",
+        "name": "Miscellanious",
+        "bgColor": "#ffffff",
+        "textColor": "#000000",
+        "textBgColor": "#b0b0b0",
+        "tasks": []
+      }
+    ]
+  }
+}
