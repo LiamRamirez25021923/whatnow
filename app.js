@@ -62,6 +62,47 @@ function createId() {
 	return crypto.randomBytes(8).toString('hex');
 }
 
+// Encryption utilities for user token (AES-256-GCM)
+const ENCRYPTION_KEY_ENV = process.env.ENCRYPTION_KEY || null; // base64 encoded 32 bytes
+let ENCRYPTION_KEY;
+if (ENCRYPTION_KEY_ENV) {
+	try {
+		ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_ENV, 'base64');
+		if (ENCRYPTION_KEY.length !== 32) ENCRYPTION_KEY = null;
+	} catch (e) {
+		ENCRYPTION_KEY = null;
+	}
+}
+if (!ENCRYPTION_KEY) {
+	// Fallback: generate a key at startup (not persisted across restarts).
+	// In production, set ENCRYPTION_KEY env var to a base64-encoded 32-byte key.
+	ENCRYPTION_KEY = crypto.randomBytes(32);
+	console.warn('Warning: using ephemeral encryption key. Set ENCRYPTION_KEY env var to persist tokens.');
+}
+
+function encryptUserToken(plaintext) {
+	const iv = crypto.randomBytes(12); // 96-bit nonce for GCM
+	const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+	const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+	const tag = cipher.getAuthTag();
+	return Buffer.concat([iv, tag, encrypted]).toString('base64');
+}
+
+function decryptUserToken(token) {
+	try {
+		const buf = Buffer.from(token, 'base64');
+		const iv = buf.slice(0, 12);
+		const tag = buf.slice(12, 28);
+		const encrypted = buf.slice(28);
+		const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+		decipher.setAuthTag(tag);
+		const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+		return decrypted.toString('utf8');
+	} catch (err) {
+		return null;
+	}
+}
+
 function formatCurrentDate(date) {
 	return new Intl.DateTimeFormat('en-US', {
 		weekday: 'long',
@@ -159,7 +200,8 @@ app.post('/register', (req, res) => {
 	}
 	const ok = createUser(username, password);
 	if (!ok) return res.status(400).render('register', { error: 'Username already taken.', username });
-	return res.redirect(`/dashboard?user=${encodeURIComponent(username)}`);
+	const token = encryptUserToken(username);
+	return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
 });
 
 app.post('/login', (req, res) => {
@@ -172,24 +214,50 @@ app.post('/login', (req, res) => {
 		return res.status(401).render('login', { error: 'Invalid username or password.', username });
 	}
 
-	return res.redirect(`/dashboard?user=${encodeURIComponent(username)}`);
+	const token = encryptUserToken(username);
+	return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
 });
 
 app.get('/dashboard', (req, res) => {
-	const user = req.query.user || 'User';
+	const queryToken = req.query.u || req.query.user || null;
+	let user = 'User';
+	let token = null;
+	if (queryToken) {
+		// If queryToken is an encrypted token, try decrypting
+		const maybeUser = decryptUserToken(queryToken);
+		if (maybeUser) {
+			user = maybeUser;
+			token = queryToken;
+		} else {
+			// treat as legacy plaintext username
+			user = queryToken;
+			token = encryptUserToken(user);
+		}
+	}
 	const error = req.query.error || null;
 	const message = req.query.message || null;
 	const userData = loadUserClasses(user);
 	const classes = attachTaskStatuses(userData.classes);
-	res.render('dashboard', { user, currentDate: formatCurrentDate(new Date()), classes, error, message });
+	res.render('dashboard', { user, token, currentDate: formatCurrentDate(new Date()), classes, error, message });
 });
 
 app.post('/dashboard/action', (req, res) => {
-	const { user, action, classId, taskId, className, bgColor, textColor, textBgColor, taskTitle, taskDeadline, taskDescription, currentPassword, newPassword, confirmPassword } = req.body;
+	const { u, action, classId, taskId, className, bgColor, textColor, textBgColor, taskTitle, taskDeadline, taskDescription, currentPassword, newPassword, confirmPassword } = req.body;
+	// Accept either encrypted token `u` or legacy plaintext `user` in body
+	let user = null;
+	let token = null;
+	if (u) {
+		user = decryptUserToken(u);
+		token = u;
+	}
+	if (!user && req.body.user) {
+		user = req.body.user;
+		token = encryptUserToken(user);
+	}
 	if (!user) return res.redirect('/');
 
 	const userData = loadUserClasses(user);
-	let redirectQuery = `user=${encodeURIComponent(user)}`;
+	let redirectQuery = `u=${encodeURIComponent(token)}`;
 
 	switch (action) {
 		case 'createClass': {

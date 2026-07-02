@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main class="page dashboard-page" data-user="<%= user %>">
+    <main class="page dashboard-page" data-user="<%= user %>" data-token="<%= token || '' %>">
       <header class="dashboard-header">
         <div class="dashboard-welcome">Welcome, <%= user %>!</div>
         <div class="dashboard-date"><%= currentDate %></div>
@@ -30,7 +30,7 @@
         <% } %>
 
         <form id="new-class-form" class="class-form hidden" action="/dashboard/action" method="post">
-          <input type="hidden" name="user" value="<%= user %>" />
+          <input type="hidden" name="u" value="<%= token || '' %>" />
           <input type="hidden" name="action" value="createClass" />
           <div class="form-row">
             <label>Class name</label>
@@ -45,7 +45,7 @@
         </form>
 
         <form id="password-form" class="class-form hidden" action="/dashboard/action" method="post">
-          <input type="hidden" name="user" value="<%= user %>" />
+          <input type="hidden" name="u" value="<%= token || '' %>" />
           <input type="hidden" name="action" value="changePassword" />
           <div class="form-row">
             <label>Current password</label>
@@ -71,7 +71,7 @@
               <div class="class-card-actions">
                 <button type="button" class="btn small secondary" data-toggle-target="#edit-class-<%= classItem.id %>">Edit class</button>
                 <form action="/dashboard/action" method="post" onsubmit="return confirm('Delete this class and all its tasks?');" class="inline-form">
-                  <input type="hidden" name="user" value="<%= user %>" />
+                  <input type="hidden" name="u" value="<%= token || '' %>" />
                   <input type="hidden" name="action" value="deleteClass" />
                   <input type="hidden" name="classId" value="<%= classItem.id %>" />
                   <button type="submit" class="btn small danger">Delete</button>
@@ -94,8 +94,8 @@
                     </div>
                     <div class="task-row-actions">
                       <button type="button" class="btn tiny secondary" data-toggle-target="#edit-task-<%= task.id %>">Edit</button>
-                      <form action="/dashboard/action" method="post" onsubmit="return confirm('Delete this task?');" class="inline-form">
-                        <input type="hidden" name="user" value="<%= user %>" />
+                        <form action="/dashboard/action" method="post" onsubmit="return confirm('Delete this task?');" class="inline-form">
+                        <input type="hidden" name="u" value="<%= token || '' %>" />
                         <input type="hidden" name="action" value="deleteTask" />
                         <input type="hidden" name="classId" value="<%= classItem.id %>" />
                         <input type="hidden" name="taskId" value="<%= task.id %>" />
@@ -105,7 +105,7 @@
                   </div>
 
                   <form id="edit-task-<%= task.id %>" class="task-edit-form hidden" action="/dashboard/action" method="post">
-                    <input type="hidden" name="user" value="<%= user %>" />
+                    <input type="hidden" name="u" value="<%= token || '' %>" />
                     <input type="hidden" name="action" value="updateTask" />
                     <input type="hidden" name="classId" value="<%= classItem.id %>" />
                     <input type="hidden" name="taskId" value="<%= task.id %>" />
@@ -126,7 +126,7 @@
             <div class="add-task-zone" aria-hidden="true"></div>
 
             <form class="task-add-form collapsed" action="/dashboard/action" method="post">
-              <input type="hidden" name="user" value="<%= user %>" />
+              <input type="hidden" name="u" value="<%= token || '' %>" />
               <input type="hidden" name="action" value="addTask" />
               <input type="hidden" name="classId" value="<%= classItem.id %>" />
               <div class="form-row">
@@ -141,7 +141,7 @@
             </form>
 
             <form id="edit-class-<%= classItem.id %>" class="class-form hidden" action="/dashboard/action" method="post">
-              <input type="hidden" name="user" value="<%= user %>" />
+              <input type="hidden" name="u" value="<%= token || '' %>" />
               <input type="hidden" name="action" value="updateClass" />
               <input type="hidden" name="classId" value="<%= classItem.id %>" />
               <div class="form-row">

@@ -69,11 +69,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // collect new order
     const order = [...grid.querySelectorAll('.class-card')].map(c => c.dataset.classId).filter(Boolean);
     const main = document.querySelector('main');
-    const user = main ? main.dataset.user : null;
-    if (!user) return;
+    const token = main ? main.dataset.token : null;
+    if (!token) return;
 
     const body = new URLSearchParams();
-    body.append('user', user);
+    body.append('u', token);
     body.append('action', 'reorderClasses');
     body.append('classOrder', JSON.stringify(order));
 
