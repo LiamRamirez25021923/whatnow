@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const pool = require('./db');
 
@@ -54,6 +55,80 @@ async function initializeDatabase() {
 		console.log('Database initialized successfully');
 	} catch (err) {
 		console.error('Error initializing database:', err);
+	}
+}
+
+// Migration function to move old JSON data to PostgreSQL
+async function migrateOldData() {
+	try {
+		const DATA_DIR = path.join(__dirname, 'data');
+		const USERS_FILE = path.join(DATA_DIR, 'users.json');
+		const CLASSES_FILE = path.join(DATA_DIR, 'classes.json');
+
+		// Check if migration has already been done
+		const existingUsers = await pool.query('SELECT COUNT(*) as count FROM users');
+		if (existingUsers.rows[0].count > 0) {
+			console.log('Migration already done, skipping...');
+			return;
+		}
+
+		// Load old JSON files
+		if (!fs.existsSync(USERS_FILE) || !fs.existsSync(CLASSES_FILE)) {
+			console.log('No old data files found, skipping migration');
+			return;
+		}
+
+		const oldUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+		const oldClasses = JSON.parse(fs.readFileSync(CLASSES_FILE, 'utf8'));
+
+		// Migrate users
+		for (const [username, userData] of Object.entries(oldUsers)) {
+			await pool.query(
+				'INSERT INTO users (username, password_salt, password_hash) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+				[username, userData.salt, userData.hash]
+			);
+		}
+
+		// Migrate classes and tasks
+		for (const [username, userClassData] of Object.entries(oldClasses)) {
+			for (let classOrder = 0; classOrder < userClassData.classes.length; classOrder++) {
+				const classItem = userClassData.classes[classOrder];
+				await pool.query(
+					`INSERT INTO classes (id, username, name, bg_color, text_color, text_bg_color, class_order) 
+					 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+					[
+						classItem.id,
+						username,
+						classItem.name,
+						classItem.bgColor,
+						classItem.textColor,
+						classItem.textBgColor,
+						classOrder
+					]
+				);
+
+				// Migrate tasks
+				for (let taskOrder = 0; taskOrder < classItem.tasks.length; taskOrder++) {
+					const task = classItem.tasks[taskOrder];
+					await pool.query(
+						`INSERT INTO tasks (id, class_id, title, deadline, description, task_order) 
+						 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
+						[
+							task.id,
+							classItem.id,
+							task.title,
+							task.deadline || '',
+							task.description || '',
+							taskOrder
+						]
+					);
+				}
+			}
+		}
+
+		console.log('Old data migrated successfully');
+	} catch (err) {
+		console.error('Error during migration:', err);
 	}
 }
 
@@ -435,6 +510,7 @@ app.post('/dashboard/action', async (req, res) => {
 
 app.listen(port, async () => {
 	await initializeDatabase();
+	await migrateOldData();
 	console.log(`WhatNow app listening on http://localhost:${port}`);
 });
 
