@@ -308,8 +308,16 @@ function hashPassword(password, salt) {
 
 async function createUser(username, password) {
 	try {
-		const users = await loadUsers();
-		if (users[username]) return false; // already exists
+		// Check if username already exists by querying the database directly
+		const existingUser = await pool.query(
+			'SELECT username FROM users WHERE username = $1',
+			[username]
+		);
+		
+		if (existingUser.rows.length > 0) {
+			return false; // User already exists
+		}
+		
 		const salt = crypto.randomBytes(16).toString('hex');
 		const hash = hashPassword(password, salt);
 		await pool.query(
@@ -319,7 +327,7 @@ async function createUser(username, password) {
 		return true;
 	} catch (err) {
 		console.error('Error creating user:', err);
-		return false;
+		throw err; // Re-throw the error so we can see what's happening
 	}
 }
 
@@ -335,7 +343,7 @@ async function verifyUser(username, password) {
 		return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(entry.password_hash, 'hex'));
 	} catch (err) {
 		console.error('Error verifying user:', err);
-		return false;
+		throw err; // Re-throw so caller can handle it
 	}
 }
 
@@ -355,10 +363,15 @@ app.post('/register', async (req, res) => {
 	if (password !== confirm) {
 		return res.status(400).render('register', { error: 'Passwords do not match.', username });
 	}
-	const ok = await createUser(username, password);
-	if (!ok) return res.status(400).render('register', { error: 'Username already taken.', username });
-	const token = encryptUserToken(username);
-	return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
+	try {
+		const ok = await createUser(username, password);
+		if (!ok) return res.status(400).render('register', { error: 'Username already taken.', username });
+		const token = encryptUserToken(username);
+		return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
+	} catch (err) {
+		console.error('Registration error:', err);
+		return res.status(500).render('register', { error: 'Database error. Please try again later.', username });
+	}
 });
 
 app.post('/login', async (req, res) => {
@@ -367,12 +380,17 @@ app.post('/login', async (req, res) => {
 		return res.status(400).render('login', { error: 'Please enter both username and password.', username: username || '' });
 	}
 
-	if (!await verifyUser(username, password)) {
-		return res.status(401).render('login', { error: 'Invalid username or password.', username });
-	}
+	try {
+		if (!await verifyUser(username, password)) {
+			return res.status(401).render('login', { error: 'Invalid username or password.', username });
+		}
 
-	const token = encryptUserToken(username);
-	return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
+		const token = encryptUserToken(username);
+		return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
+	} catch (err) {
+		console.error('Login error:', err);
+		return res.status(500).render('login', { error: 'Database error. Please try again later.', username });
+	}
 });
 
 app.get('/dashboard', async (req, res) => {
