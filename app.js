@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
+const pool = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3002;
@@ -12,50 +12,117 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const DATA_DIR = path.join(__dirname, 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-
-function loadUsers() {
+// Initialize database tables
+async function initializeDatabase() {
 	try {
-		if (!fs.existsSync(USERS_FILE)) return {};
-		const raw = fs.readFileSync(USERS_FILE, 'utf8');
-		return JSON.parse(raw || '{}');
+		// Create users table
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS users (
+				username VARCHAR(255) PRIMARY KEY,
+				password_salt VARCHAR(255) NOT NULL,
+				password_hash VARCHAR(255) NOT NULL
+			)
+		`);
+
+		// Create classes table
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS classes (
+				id VARCHAR(255) PRIMARY KEY,
+				username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+				name VARCHAR(255) NOT NULL,
+				bg_color VARCHAR(255) NOT NULL,
+				text_color VARCHAR(255) NOT NULL,
+				text_bg_color VARCHAR(255) NOT NULL,
+				class_order INTEGER NOT NULL DEFAULT 0,
+				UNIQUE(id)
+			)
+		`);
+
+		// Create tasks table
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS tasks (
+				id VARCHAR(255) PRIMARY KEY,
+				class_id VARCHAR(255) NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+				title VARCHAR(255) NOT NULL,
+				deadline VARCHAR(255),
+				description TEXT,
+				task_order INTEGER NOT NULL DEFAULT 0,
+				UNIQUE(id)
+			)
+		`);
+
+		console.log('Database initialized successfully');
 	} catch (err) {
+		console.error('Error initializing database:', err);
+	}
+}
+
+// Database functions for users
+async function loadUsers() {
+	try {
+		const result = await pool.query('SELECT username, password_salt, password_hash FROM users');
+		const users = {};
+		result.rows.forEach(row => {
+			users[row.username] = { salt: row.password_salt, hash: row.password_hash };
+		});
+		return users;
+	} catch (err) {
+		console.error('Error loading users:', err);
 		return {};
 	}
 }
 
-function saveUsers(users) {
-	if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-	fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+async function saveUsers(users) {
+	// This function is no longer needed since we save individually
+	// Kept for compatibility
 }
 
-const CLASSES_FILE = path.join(DATA_DIR, 'classes.json');
-
-function loadClassesData() {
+// Database functions for classes
+async function loadUserClasses(username) {
 	try {
-		if (!fs.existsSync(CLASSES_FILE)) return {};
-		const raw = fs.readFileSync(CLASSES_FILE, 'utf8');
-		return JSON.parse(raw || '{}');
+		const classesResult = await pool.query(
+			`SELECT id, name, bg_color, text_color, text_bg_color, class_order 
+			 FROM classes 
+			 WHERE username = $1 
+			 ORDER BY class_order ASC, id ASC`,
+			[username]
+		);
+
+		const classes = [];
+		for (const classRow of classesResult.rows) {
+			const tasksResult = await pool.query(
+				`SELECT id, title, deadline, description 
+				 FROM tasks 
+				 WHERE class_id = $1 
+				 ORDER BY task_order ASC, id ASC`,
+				[classRow.id]
+			);
+
+			classes.push({
+				id: classRow.id,
+				name: classRow.name,
+				bgColor: classRow.bg_color,
+				textColor: classRow.text_color,
+				textBgColor: classRow.text_bg_color,
+				tasks: tasksResult.rows.map(row => ({
+					id: row.id,
+					title: row.title,
+					deadline: row.deadline || '',
+					description: row.description || ''
+				}))
+			});
+		}
+
+		return { classes };
 	} catch (err) {
-		return {};
+		console.error('Error loading user classes:', err);
+		return { classes: [] };
 	}
 }
 
-function saveClassesData(data) {
-	if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-	fs.writeFileSync(CLASSES_FILE, JSON.stringify(data, null, 2), 'utf8');
-}
-
-function loadUserClasses(username) {
-	const all = loadClassesData();
-	return all[username] || { classes: [] };
-}
-
-function saveUserClasses(username, userData) {
-	const all = loadClassesData();
-	all[username] = userData;
-	saveClassesData(all);
+async function saveUserClasses(username, userData) {
+	// This function is called to save changes, but with DB we save incrementally
+	// Kept for compatibility
 }
 
 function createId() {
@@ -164,22 +231,37 @@ function hashPassword(password, salt) {
 	return derived.toString('hex');
 }
 
-function createUser(username, password) {
-	const users = loadUsers();
-	if (users[username]) return false; // already exists
-	const salt = crypto.randomBytes(16).toString('hex');
-	const hash = hashPassword(password, salt);
-	users[username] = { salt, hash };
-	saveUsers(users);
-	return true;
+async function createUser(username, password) {
+	try {
+		const users = await loadUsers();
+		if (users[username]) return false; // already exists
+		const salt = crypto.randomBytes(16).toString('hex');
+		const hash = hashPassword(password, salt);
+		await pool.query(
+			'INSERT INTO users (username, password_salt, password_hash) VALUES ($1, $2, $3)',
+			[username, salt, hash]
+		);
+		return true;
+	} catch (err) {
+		console.error('Error creating user:', err);
+		return false;
+	}
 }
 
-function verifyUser(username, password) {
-	const users = loadUsers();
-	const entry = users[username];
-	if (!entry) return false;
-	const hash = hashPassword(password, entry.salt);
-	return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(entry.hash, 'hex'));
+async function verifyUser(username, password) {
+	try {
+		const result = await pool.query(
+			'SELECT password_salt, password_hash FROM users WHERE username = $1',
+			[username]
+		);
+		if (result.rows.length === 0) return false;
+		const entry = result.rows[0];
+		const hash = hashPassword(password, entry.password_salt);
+		return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(entry.password_hash, 'hex'));
+	} catch (err) {
+		console.error('Error verifying user:', err);
+		return false;
+	}
 }
 
 app.get('/', (req, res) => {
@@ -190,7 +272,7 @@ app.get('/register', (req, res) => {
 	res.render('register', { error: null, username: '' });
 });
 
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
 	const { username, password, confirm } = req.body;
 	if (!username || !password) {
 		return res.status(400).render('register', { error: 'Please provide a username and password.', username: username || '' });
@@ -198,19 +280,19 @@ app.post('/register', (req, res) => {
 	if (password !== confirm) {
 		return res.status(400).render('register', { error: 'Passwords do not match.', username });
 	}
-	const ok = createUser(username, password);
+	const ok = await createUser(username, password);
 	if (!ok) return res.status(400).render('register', { error: 'Username already taken.', username });
 	const token = encryptUserToken(username);
 	return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
 	const { username, password } = req.body;
 	if (!username || !password) {
 		return res.status(400).render('login', { error: 'Please enter both username and password.', username: username || '' });
 	}
 
-	if (!verifyUser(username, password)) {
+	if (!await verifyUser(username, password)) {
 		return res.status(401).render('login', { error: 'Invalid username or password.', username });
 	}
 
@@ -218,7 +300,7 @@ app.post('/login', (req, res) => {
 	return res.redirect(`/dashboard?u=${encodeURIComponent(token)}`);
 });
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', async (req, res) => {
 	const queryToken = req.query.u || null;
 	if (!queryToken) {
 		return res.redirect('/');
@@ -232,12 +314,12 @@ app.get('/dashboard', (req, res) => {
 	const token = queryToken;
 	const error = req.query.error || null;
 	const message = req.query.message || null;
-	const userData = loadUserClasses(user);
+	const userData = await loadUserClasses(user);
 	const classes = attachTaskStatuses(userData.classes);
 	res.render('dashboard', { user, token, currentDate: formatCurrentDate(new Date()), classes, error, message });
 });
 
-app.post('/dashboard/action', (req, res) => {
+app.post('/dashboard/action', async (req, res) => {
 	const { u, action, classId, taskId, className, bgColor, textColor, textBgColor, taskTitle, taskDeadline, taskDescription, currentPassword, newPassword, confirmPassword } = req.body;
 	let user = null;
 	let token = null;
@@ -247,108 +329,112 @@ app.post('/dashboard/action', (req, res) => {
 	}
 	if (!user) return res.redirect('/');
 
-	const userData = loadUserClasses(user);
 	let redirectQuery = `u=${encodeURIComponent(token)}`;
 
-	switch (action) {
-		case 'createClass': {
-			userData.classes.unshift({
-				id: createId(),
-				name: (className || 'New class').trim() || 'New class',
-				bgColor: bgColor || '#ff9898',
-				textColor: textColor || '#3d1f0f',
-				textBgColor: textBgColor || '#ffffff',
-				tasks: []
-			});
-			break;
-		}
-		case 'updateClass': {
-			const classItem = userData.classes.find((entry) => entry.id === classId);
-			if (classItem) {
-				classItem.name = (className || classItem.name).trim() || classItem.name;
-				classItem.bgColor = bgColor || classItem.bgColor;
-				classItem.textColor = textColor || classItem.textColor;
-				classItem.textBgColor = textBgColor || classItem.textBgColor;
+	try {
+		switch (action) {
+			case 'createClass': {
+				const newClassId = createId();
+				await pool.query(
+					`INSERT INTO classes (id, username, name, bg_color, text_color, text_bg_color, class_order)
+					 VALUES ($1, $2, $3, $4, $5, $6, (SELECT COALESCE(MAX(class_order), 0) + 1 FROM classes WHERE username = $2))`,
+					[newClassId, user, (className || 'New class').trim() || 'New class', bgColor || '#ff9898', textColor || '#3d1f0f', textBgColor || '#ffffff']
+				);
+				break;
 			}
-			break;
-		}
-		case 'addTask': {
-			const classItem = userData.classes.find((entry) => entry.id === classId);
-			if (classItem && taskTitle) {
-				classItem.tasks.unshift({
-					id: createId(),
-					title: taskTitle.trim(),
-					deadline: taskDeadline ? taskDeadline : '',
-					description: (taskDescription || '').trim()
-				});
+			case 'updateClass': {
+				await pool.query(
+					`UPDATE classes SET name = $1, bg_color = $2, text_color = $3, text_bg_color = $4
+					 WHERE id = $5 AND username = $6`,
+					[(className || 'New class').trim() || 'New class', bgColor || '#ff9898', textColor || '#3d1f0f', textBgColor || '#ffffff', classId, user]
+				);
+				break;
 			}
-			break;
-		}
-		case 'updateTask': {
-			const classItem = userData.classes.find((entry) => entry.id === classId);
-			if (classItem) {
-				const task = classItem.tasks.find((entry) => entry.id === taskId);
-				if (task) {
-					task.title = (taskTitle || task.title).trim() || task.title;
-					task.deadline = typeof taskDeadline === 'string' ? taskDeadline.trim() : task.deadline;
-					task.description = (typeof taskDescription === 'string' ? taskDescription.trim() : task.description || '');
+			case 'addTask': {
+				if (taskTitle) {
+					const newTaskId = createId();
+					await pool.query(
+						`INSERT INTO tasks (id, class_id, title, deadline, description, task_order)
+						 VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(task_order), 0) + 1 FROM tasks WHERE class_id = $2))`,
+						[newTaskId, classId, taskTitle.trim(), taskDeadline ? taskDeadline : '', (taskDescription || '').trim()]
+					);
 				}
+				break;
 			}
-			break;
-		}
-		case 'deleteTask': {
-			const classItem = userData.classes.find((entry) => entry.id === classId);
-			if (classItem) {
-				classItem.tasks = classItem.tasks.filter((entry) => entry.id !== taskId);
+			case 'updateTask': {
+				await pool.query(
+					`UPDATE tasks SET title = $1, deadline = $2, description = $3
+					 WHERE id = $4 AND class_id = $5`,
+					[(taskTitle || '').trim() || 'Task', typeof taskDeadline === 'string' ? taskDeadline.trim() : '', typeof taskDescription === 'string' ? taskDescription.trim() : '', taskId, classId]
+				);
+				break;
 			}
-			break;
-		}
-		case 'deleteClass': {
-			userData.classes = userData.classes.filter((entry) => entry.id !== classId);
-			break;
-		}
-		case 'reorderClasses': {
-			try {
-				const order = JSON.parse(req.body.classOrder || '[]');
-				if (Array.isArray(order) && order.length) {
-					const idToClass = Object.fromEntries(userData.classes.map(c => [c.id, c]));
-					userData.classes = order.map(id => idToClass[id]).filter(Boolean);
+			case 'deleteTask': {
+				await pool.query(
+					'DELETE FROM tasks WHERE id = $1 AND class_id = $2',
+					[taskId, classId]
+				);
+				break;
+			}
+			case 'deleteClass': {
+				await pool.query(
+					'DELETE FROM classes WHERE id = $1 AND username = $2',
+					[classId, user]
+				);
+				break;
+			}
+			case 'reorderClasses': {
+				try {
+					const order = JSON.parse(req.body.classOrder || '[]');
+					if (Array.isArray(order) && order.length) {
+						for (let i = 0; i < order.length; i++) {
+							await pool.query(
+								'UPDATE classes SET class_order = $1 WHERE id = $2 AND username = $3',
+								[i, order[i], user]
+							);
+						}
+					}
+				} catch (err) {
+					// ignore malformed input
 				}
-			} catch (err) {
-				// ignore malformed input
+				break;
 			}
-			break;
+			case 'changePassword': {
+				if (!currentPassword || !newPassword || !confirmPassword) {
+					redirectQuery += `&error=${encodeURIComponent('Please fill in all password fields.')}`;
+					return res.redirect(`/dashboard?${redirectQuery}`);
+				}
+
+				if (newPassword !== confirmPassword) {
+					redirectQuery += `&error=${encodeURIComponent('New passwords do not match.')}`;
+					return res.redirect(`/dashboard?${redirectQuery}`);
+				}
+
+				if (!await verifyUser(user, currentPassword)) {
+					redirectQuery += `&error=${encodeURIComponent('Current password is incorrect.')}`;
+					return res.redirect(`/dashboard?${redirectQuery}`);
+				}
+
+				const salt = crypto.randomBytes(16).toString('hex');
+				const hash = hashPassword(newPassword, salt);
+				await pool.query(
+					'UPDATE users SET password_salt = $1, password_hash = $2 WHERE username = $3',
+					[salt, hash, user]
+				);
+				redirectQuery += `&message=${encodeURIComponent('Password updated successfully.')}`;
+				return res.redirect(`/dashboard?${redirectQuery}`);
+			}
 		}
-		case 'changePassword': {
-			if (!currentPassword || !newPassword || !confirmPassword) {
-				redirectQuery += `&error=${encodeURIComponent('Please fill in all password fields.')}`;
-				return res.redirect(`/dashboard?${redirectQuery}`);
-			}
-
-			if (newPassword !== confirmPassword) {
-				redirectQuery += `&error=${encodeURIComponent('New passwords do not match.')}`;
-				return res.redirect(`/dashboard?${redirectQuery}`);
-			}
-
-			if (!verifyUser(user, currentPassword)) {
-				redirectQuery += `&error=${encodeURIComponent('Current password is incorrect.')}`;
-				return res.redirect(`/dashboard?${redirectQuery}`);
-			}
-
-			const users = loadUsers();
-			const salt = crypto.randomBytes(16).toString('hex');
-			users[user] = { salt, hash: hashPassword(newPassword, salt) };
-			saveUsers(users);
-			redirectQuery += `&message=${encodeURIComponent('Password updated successfully.')}`;
-			return res.redirect(`/dashboard?${redirectQuery}`);
-		}
+	} catch (err) {
+		console.error('Error in dashboard action:', err);
+		redirectQuery += `&error=${encodeURIComponent('An error occurred. Please try again.')}`;
 	}
 
-	saveUserClasses(user, userData);
 	res.redirect(`/dashboard?${redirectQuery}`);
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
+	await initializeDatabase();
 	console.log(`WhatNow app listening on http://localhost:${port}`);
 });
 
