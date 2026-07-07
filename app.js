@@ -13,6 +13,18 @@ app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+
+  res.on('finish', () => {
+    console.log(
+      `[REQUEST] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`
+    );
+  });
+
+  next();
+});
+
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
@@ -184,6 +196,30 @@ function verifyUser(username, password) {
 	const hash = hashPassword(password, entry.salt);
 	return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(entry.hash, 'hex'));
 }
+
+app.get('/health/db', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW() AS server_time');
+
+    res.json({
+      ok: true,
+      message: 'Database connection works',
+      serverTime: result.rows[0].server_time
+    });
+  } catch (err) {
+    console.error('[DB HEALTH ERROR]', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+
+    res.status(500).json({
+      ok: false,
+      message: err.message,
+      code: err.code
+    });
+  }
+});
 
 app.get('/', (req, res) => {
   if (req.session && req.session.userId) {
