@@ -231,80 +231,87 @@
     </main>
 
     <script src="/dashboard.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
-<script>
-  const classesGrid = document.getElementById('classesGrid');
+    <script>
+      const classesGrid = document.getElementById('classesGrid');
+      let savingOrder = false;
 
-  let savingOrder = false;
+      async function saveClassOrder() {
+        if (!classesGrid || savingOrder) return;
 
-  async function saveClassOrder() {
-    if (!classesGrid || savingOrder) return;
+        savingOrder = true;
 
-    savingOrder = true;
+        const order = [...classesGrid.querySelectorAll('.class-card')]
+          .map(card => card.dataset.classId)
+          .filter(Boolean);
 
-    const order = [...classesGrid.querySelectorAll('.class-card')]
-      .map(card => card.dataset.classId);
+        console.log('Saving class order:', order);
 
-    console.log('Saving class order:', order);
+        try {
+          const response = await fetch('/classes/reorder', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ order })
+          });
 
-    try {
-      const response = await fetch('/classes/reorder', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({ order })
-      });
+          const result = await response.json();
 
-      const result = await response.json();
+          if (!response.ok || !result.ok) {
+            throw new Error(result.message || 'Could not save class order.');
+          }
 
-      if (!response.ok || !result.ok) {
-        throw new Error(result.message || 'Could not save class order.');
+          console.log('Class order saved.');
+        } catch (err) {
+          console.error('Could not save class order:', err);
+          alert('Could not save class order. The page will reload.');
+          location.reload();
+        } finally {
+          savingOrder = false;
+        }
       }
 
-      console.log('Class order saved.');
-    } catch (err) {
-      console.error('Could not save class order:', err);
-      alert('Could not save class order. The page will reload.');
-      location.reload();
-    } finally {
-      savingOrder = false;
-    }
-  }
+      if (classesGrid && window.Sortable) {
+        new Sortable(classesGrid, {
+          animation: 180,
+          handle: '.drag-handle',
 
-  if (classesGrid) {
-    new Sortable(classesGrid, {
-      animation: 120,
-      handle: '.drag-handle',
+          direction: function () {
+            return 'horizontal';
+          },
 
-      // Makes drag behaviour more predictable in grid layouts
-      forceFallback: true,
-      fallbackOnBody: true,
-      fallbackTolerance: 6,
+          swapThreshold: 0.55,
+          invertedSwapThreshold: 0.35,
+          invertSwap: false,
 
-      // Helps Sortable decide when to swap cards
-      swapThreshold: 0.65,
-      invertSwap: true,
+          forceFallback: true,
+          fallbackOnBody: true,
+          fallbackTolerance: 5,
 
-      ghostClass: 'class-card-ghost',
-      chosenClass: 'class-card-chosen',
-      dragClass: 'class-card-drag',
+          scroll: true,
+          scrollSensitivity: 80,
+          scrollSpeed: 12,
 
-      // Prevent dragging when clicking buttons/forms/tasks
-      filter: 'button, input, textarea, select, a, form, .task-row, .task-list, .task-add-form, .class-card-actions',
-      preventOnFilter: false,
+          ghostClass: 'class-card-ghost',
+          chosenClass: 'class-card-chosen',
+          dragClass: 'class-card-drag',
 
-      onStart: () => {
-        document.body.classList.add('is-sorting-classes');
-      },
+          filter: 'button:not(.drag-handle), input, textarea, select, a, form, .task-row, .task-list, .task-add-form, .class-card-actions',
+          preventOnFilter: false,
 
-      onEnd: async () => {
-        document.body.classList.remove('is-sorting-classes');
-        await saveClassOrder();
+          onStart: function () {
+            document.body.classList.add('is-sorting-classes');
+          },
+
+          onEnd: async function () {
+            document.body.classList.remove('is-sorting-classes');
+            await saveClassOrder();
+          }
+        });
       }
-    });
-  }
-</script>
+    </script>
+  </body>
+</html>
