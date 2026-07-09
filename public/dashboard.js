@@ -1,112 +1,193 @@
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('[data-toggle-target]').forEach(function (toggle) {
-    toggle.addEventListener('click', function () {
-      const target = document.querySelector(this.dataset.toggleTarget);
+document.addEventListener('DOMContentLoaded', () => {
+  initToggleTargets();
+  initAddTaskZones();
+  initClassReordering();
+  protectFormControlsFromDrag();
+});
+
+function initToggleTargets() {
+  document.querySelectorAll('[data-toggle-target]').forEach((trigger) => {
+    trigger.addEventListener('click', (event) => {
+      const selector = trigger.dataset.toggleTarget;
+      if (!selector) return;
+
+      const target = document.querySelector(selector);
       if (!target) return;
+
+      event.preventDefault();
+
       target.classList.toggle('hidden');
-      if (!target.classList.contains('hidden')) {
-        const firstInput = target.querySelector('input:not([type=hidden])');
-        if (firstInput) firstInput.focus();
+
+      const firstInput = target.querySelector('input, textarea, select');
+      if (!target.classList.contains('hidden') && firstInput) {
+        setTimeout(() => firstInput.focus(), 50);
       }
     });
   });
-});
+}
 
-// Drag-and-drop reordering for class cards
-document.addEventListener('DOMContentLoaded', function () {
-  const grid = document.querySelector('.classes-grid');
-  if (!grid) return;
+function initAddTaskZones() {
+  document.querySelectorAll('.add-task-zone').forEach((zone) => {
+    zone.addEventListener('click', () => {
+      const form = zone.nextElementSibling;
 
-  let dragSrcEl = null;
-
-  function handleDragStart(e) {
-    dragSrcEl = this;
-    this.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    try { e.dataTransfer.setData('text/plain', this.dataset.classId); } catch (err) {}
-  }
-
-  function handleDragEnd() {
-    this.classList.remove('dragging');
-  }
-
-  function getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.class-card:not(.dragging)')];
-    return draggableElements.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) {
-        return { offset, element: child };
-      } else {
-        return closest;
+      if (!form || !form.classList.contains('task-add-form')) {
+        return;
       }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
 
-  function attachDnD(card) {
-    card.setAttribute('draggable', 'true');
-    card.addEventListener('dragstart', handleDragStart);
-    card.addEventListener('dragend', handleDragEnd);
-  }
+      form.classList.toggle('collapsed');
 
-  // initialize existing cards
-  grid.querySelectorAll('.class-card').forEach(attachDnD);
-
-  grid.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const afterElement = getDragAfterElement(grid, e.clientY);
-    const dragging = grid.querySelector('.dragging');
-    if (!dragging) return;
-    if (!afterElement) {
-      grid.appendChild(dragging);
-    } else {
-      grid.insertBefore(dragging, afterElement);
-    }
+      const firstInput = form.querySelector('input[name="taskTitle"]');
+      if (!form.classList.contains('collapsed') && firstInput) {
+        setTimeout(() => firstInput.focus(), 50);
+      }
+    });
   });
+}
 
-  grid.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    // collect new order
-    const order = [...grid.querySelectorAll('.class-card')].map(c => c.dataset.classId).filter(Boolean);
-    const main = document.querySelector('main');
-    const token = main ? main.dataset.token : null;
-    if (!token) return;
+function initClassReordering() {
+  const classesGrid = document.getElementById('classesGrid');
 
-    const body = new URLSearchParams();
-    body.append('u', token);
-    body.append('action', 'reorderClasses');
-    body.append('classOrder', JSON.stringify(order));
+  if (!classesGrid) {
+    return;
+  }
+
+  if (typeof Sortable === 'undefined') {
+    console.warn('SortableJS is not loaded. Class reordering is disabled.');
+    return;
+  }
+
+  let savingOrder = false;
+
+  async function saveClassOrder() {
+    if (savingOrder) return;
+
+    savingOrder = true;
+
+    const order = [...classesGrid.querySelectorAll('.class-card')]
+      .map((card) => card.dataset.classId)
+      .filter(Boolean);
+
+    console.log('Saving class order:', order);
 
     try {
-      await fetch('/dashboard/action', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
-    } catch (err) {
-      console.error('Failed to save class order', err);
-    }
-  });
-
-  // Observe for newly added cards (e.g., after creating a class)
-  const mo = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      m.addedNodes.forEach(node => {
-        if (node.nodeType === 1 && node.classList.contains('class-card')) attachDnD(node);
+      const response = await fetch('/classes/reorder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ order })
       });
-    }
-  });
-  mo.observe(grid, { childList: true, subtree: false });
 
-  // toggle collapsed add form on click for accessibility (mobile)
-  grid.addEventListener('click', (e) => {
-    const zone = e.target.closest('.add-task-zone');
-    const collapsed = e.target.closest('.task-add-form.collapsed');
-    const target = zone || collapsed;
-    if (target) {
-      const form = target.closest('.class-card')?.querySelector('.task-add-form.collapsed');
-      if (form) {
-        form.classList.remove('collapsed');
-        form.style.visibility = 'visible';
-        const firstInput = form.querySelector('.text-input');
-        if (firstInput) firstInput.focus();
+      const contentType = response.headers.get('content-type') || '';
+
+      const result = contentType.includes('application/json')
+        ? await response.json()
+        : { ok: false, message: await response.text() };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || 'Could not save class order.');
       }
+
+      console.log('Class order saved.');
+    } catch (err) {
+      console.error('Could not save class order:', err);
+      alert('Could not save class order. The page will reload.');
+      location.reload();
+    } finally {
+      savingOrder = false;
+    }
+  }
+
+  new Sortable(classesGrid, {
+    animation: 150,
+
+    // Only the grabby icon can start dragging.
+    handle: '.drag-handle',
+
+    // Only class cards are sortable.
+    draggable: '.class-card',
+
+    // Swap card positions instead of making the whole grid slide around.
+    swap: true,
+    swapClass: 'class-card-swap-target',
+
+    direction: 'horizontal',
+    swapThreshold: 0.65,
+    invertedSwapThreshold: 0.35,
+
+    ghostClass: 'class-card-ghost',
+    chosenClass: 'class-card-chosen',
+    dragClass: 'class-card-drag',
+
+    // Do not start dragging from normal controls.
+    filter: [
+      'button:not(.drag-handle)',
+      'input',
+      'input[type="color"]',
+      'textarea',
+      'select',
+      'a',
+      'form',
+      'label',
+      '.task-row',
+      '.task-list',
+      '.task-add-form',
+      '.task-edit-form',
+      '.class-form',
+      '.class-card-actions',
+      '.color-row'
+    ].join(', '),
+
+    preventOnFilter: false,
+
+    onStart(event) {
+      const originalTarget = event.originalEvent && event.originalEvent.target;
+      const startedFromHandle = originalTarget && originalTarget.closest('.drag-handle');
+
+      if (!startedFromHandle) {
+        return false;
+      }
+
+      document.body.classList.add('is-sorting-classes');
+    },
+
+    onEnd() {
+      document.body.classList.remove('is-sorting-classes');
+      saveClassOrder();
+    },
+
+    onCancel() {
+      document.body.classList.remove('is-sorting-classes');
     }
   });
-});
+}
+
+function protectFormControlsFromDrag() {
+  const protectedSelectors = [
+    'input',
+    'input[type="color"]',
+    'textarea',
+    'select',
+    'label',
+    '.class-form',
+    '.task-add-form',
+    '.task-edit-form',
+    '.color-row'
+  ].join(', ');
+
+  document.querySelectorAll(protectedSelectors).forEach((element) => {
+    element.addEventListener('pointerdown', stopDragBubble);
+    element.addEventListener('mousedown', stopDragBubble);
+    element.addEventListener('touchstart', stopDragBubble, { passive: true });
+  });
+}
+
+function stopDragBubble(event) {
+  const isDragHandle = event.target.closest('.drag-handle');
+
+  if (!isDragHandle) {
+    event.stopPropagation();
+  }
+}
