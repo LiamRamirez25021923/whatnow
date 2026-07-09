@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -518,26 +520,26 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
 
     switch (action) {
       case 'createClass': {
-  await pool.query(
-    `INSERT INTO classes
-     (user_id, name, bg_color, text_color, text_bg_color, sort_order)
-     VALUES (
-       $1,
-       $2,
-       $3,
-       $4,
-       $5,
-       COALESCE(
-         (SELECT MAX(sort_order) + 1 FROM classes WHERE user_id = $1),
-         0
-       )
-     )`,
-    [
-      userId,
-      (className || 'New class').trim() || 'New class',
-      bgColor || '#ff9898',
-      textColor || '#3d1f0f',
-      textBgColor || '#ffffff'
+        await pool.query(
+          `INSERT INTO classes
+          (user_id, name, bg_color, text_color, text_bg_color, sort_order)
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            COALESCE(
+              (SELECT MAX(sort_order) + 1 FROM classes WHERE user_id = $1),
+              0
+            )
+          )`,
+          [
+            userId,
+            (className || 'New class').trim() || 'New class',
+            bgColor || '#ff9898',
+            textColor || '#3d1f0f',
+            textBgColor || '#ffffff'
     ]
   );
 

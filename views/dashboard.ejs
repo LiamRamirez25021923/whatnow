@@ -276,24 +276,15 @@
 
       if (classesGrid && window.Sortable) {
         new Sortable(classesGrid, {
-          animation: 180,
+          animation: 150,
           handle: '.drag-handle',
 
-          direction: function () {
-            return 'horizontal';
-          },
+          swap: true,
+          swapClass: 'class-card-swap-target',
 
-          swapThreshold: 0.55,
+          direction: 'horizontal',
+          swapThreshold: 0.65,
           invertedSwapThreshold: 0.35,
-          invertSwap: false,
-
-          forceFallback: true,
-          fallbackOnBody: true,
-          fallbackTolerance: 5,
-
-          scroll: true,
-          scrollSensitivity: 80,
-          scrollSpeed: 12,
 
           ghostClass: 'class-card-ghost',
           chosenClass: 'class-card-chosen',
