@@ -21,6 +21,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 
 app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -240,7 +241,7 @@ async function loadUserClasses(userId) {
     `SELECT id, name, bg_color, text_color, text_bg_color
      FROM classes
      WHERE user_id = $1
-     ORDER BY sort_order ASC, created_at DESC`,
+     ORDER BY sort_order ASC, created_at ASC`,
     [userId]
   );
 
@@ -251,7 +252,7 @@ async function loadUserClasses(userId) {
       `SELECT id, title, deadline, description
        FROM tasks
        WHERE class_id = $1
-       ORDER BY sort_order ASC, created_at DESC`,
+       ORDER BY sort_order ASC, created_at ASC`,
       [classRow.id]
     );
 
@@ -439,6 +440,62 @@ app.get('/dashboard', requireLogin, async (req, res) => {
   }
 });
 
+app.post('/classes/reorder', requireLogin, async (req, res) => {
+  const { order } = req.body;
+  const userId = req.session.userId;
+
+  if (!Array.isArray(order)) {
+    return res.status(400).json({
+      ok: false,
+      message: 'Invalid class order.'
+    });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    for (let i = 0; i < order.length; i++) {
+      await client.query(
+        `UPDATE classes
+         SET sort_order = $1
+         WHERE id = $2
+         AND user_id = $3`,
+        [i, order[i], userId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    console.log('[CLASS ORDER SAVED]', {
+      userId,
+      order
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Class order saved.'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+
+    console.error('[CLASS REORDER ERROR]', {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      stack: err.stack
+    });
+
+    return res.status(500).json({
+      ok: false,
+      message: 'Could not save class order.'
+    });
+  } finally {
+    client.release();
+  }
+});
+
 app.post('/dashboard/action', requireLogin, async (req, res) => {
   try {
     const {
@@ -461,21 +518,31 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
 
     switch (action) {
       case 'createClass': {
-        await pool.query(
-          `INSERT INTO classes
-           (user_id, name, bg_color, text_color, text_bg_color)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            userId,
-            (className || 'New class').trim() || 'New class',
-            bgColor || '#ff9898',
-            textColor || '#3d1f0f',
-            textBgColor || '#ffffff'
-          ]
-        );
+  await pool.query(
+    `INSERT INTO classes
+     (user_id, name, bg_color, text_color, text_bg_color, sort_order)
+     VALUES (
+       $1,
+       $2,
+       $3,
+       $4,
+       $5,
+       COALESCE(
+         (SELECT MAX(sort_order) + 1 FROM classes WHERE user_id = $1),
+         0
+       )
+     )`,
+    [
+      userId,
+      (className || 'New class').trim() || 'New class',
+      bgColor || '#ff9898',
+      textColor || '#3d1f0f',
+      textBgColor || '#ffffff'
+    ]
+  );
 
-        break;
-      }
+  break;
+}
 
       case 'updateClass': {
         await pool.query(

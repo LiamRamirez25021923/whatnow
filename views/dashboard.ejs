@@ -8,8 +8,9 @@
     <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/styles.css">
   </head>
+
   <body>
-    <main class="page dashboard-page" data-user="<%= user %>" data-token="<%= token || '' %>">
+    <main class="page dashboard-page" data-user="<%= user %>">
       <header class="dashboard-header">
         <div class="dashboard-welcome">Welcome, <%= user %>!</div>
         <div class="dashboard-date"><%= currentDate %></div>
@@ -19,59 +20,94 @@
         <div class="dashboard-actions">
           <button type="button" class="btn secondary" data-toggle-target="#new-class-form">+ Create Class</button>
           <button type="button" class="btn secondary" data-toggle-target="#password-form">Change Password</button>
-          <a class="btn logout" href="/">Log out</a>
+          <a class="btn logout" href="/logout">Log out</a>
         </div>
 
         <% if (error) { %>
           <div class="message-banner error-banner"><%= error %></div>
         <% } %>
+
         <% if (message) { %>
           <div class="message-banner success-banner"><%= message %></div>
         <% } %>
 
         <form id="new-class-form" class="class-form hidden" action="/dashboard/action" method="post">
-          <input type="hidden" name="u" value="<%= token || '' %>" />
           <input type="hidden" name="action" value="createClass" />
+
           <div class="form-row">
             <label>Class name</label>
             <input class="text-input" name="className" placeholder="Example: C327 Software App Development" />
           </div>
+
           <div class="form-row color-row">
-            <label><span>Background</span><input type="color" name="bgColor" value="#ff9aa2" /></label>
-            <label><span>Text</span><input type="color" name="textColor" value="#4d2c17" /></label>
-            <label><span>Text background</span><input type="color" name="textBgColor" value="#ffffff" /></label>
+            <label>
+              <span>Background</span>
+              <input type="color" name="bgColor" value="#ff9aa2" />
+            </label>
+
+            <label>
+              <span>Text</span>
+              <input type="color" name="textColor" value="#4d2c17" />
+            </label>
+
+            <label>
+              <span>Text background</span>
+              <input type="color" name="textBgColor" value="#ffffff" />
+            </label>
           </div>
+
           <button type="submit" class="btn">Create class</button>
         </form>
 
         <form id="password-form" class="class-form hidden" action="/dashboard/action" method="post">
-          <input type="hidden" name="u" value="<%= token || '' %>" />
           <input type="hidden" name="action" value="changePassword" />
+
           <div class="form-row">
             <label>Current password</label>
             <input class="text-input" type="password" name="currentPassword" placeholder="Current password" />
           </div>
+
           <div class="form-row">
             <label>New password</label>
             <input class="text-input" type="password" name="newPassword" placeholder="New password" />
           </div>
+
           <div class="form-row">
             <label>Confirm new password</label>
             <input class="text-input" type="password" name="confirmPassword" placeholder="Confirm new password" />
           </div>
+
           <button type="submit" class="btn">Save password</button>
         </form>
       </section>
 
-      <section class="classes-grid">
+      <section class="classes-grid" id="classesGrid">
         <% classes.forEach(function(classItem) { %>
-          <section class="class-card" data-class-id="<%= classItem.id %>" style="background: <%= classItem.bgColor %>; color: <%= classItem.textColor %>;">
+          <section
+            class="class-card"
+            data-class-id="<%= classItem.id %>"
+            style="background: <%= classItem.bgColor %>; color: <%= classItem.textColor %>;"
+          >
             <div class="class-card-header">
-              <h2><%= classItem.name %></h2>
+              <div class="class-title-area">
+                <button type="button" class="drag-handle" title="Drag to reorder" aria-label="Drag class">
+                  ☷
+                </button>
+
+                <h2><%= classItem.name %></h2>
+              </div>
+
               <div class="class-card-actions">
-                <button type="button" class="btn small secondary" data-toggle-target="#edit-class-<%= classItem.id %>">Edit class</button>
-                <form action="/dashboard/action" method="post" onsubmit="return confirm('Delete this class and all its tasks?');" class="inline-form">
-                  <input type="hidden" name="u" value="<%= token || '' %>" />
+                <button type="button" class="btn small secondary" data-toggle-target="#edit-class-<%= classItem.id %>">
+                  Edit class
+                </button>
+
+                <form
+                  action="/dashboard/action"
+                  method="post"
+                  onsubmit="return confirm('Delete this class and all its tasks?');"
+                  class="inline-form"
+                >
                   <input type="hidden" name="action" value="deleteClass" />
                   <input type="hidden" name="classId" value="<%= classItem.id %>" />
                   <button type="submit" class="btn small danger">Delete</button>
@@ -86,16 +122,33 @@
                 <% classItem.tasks.forEach(function(task) { %>
                   <div class="task-row">
                     <div class="task-labels" data-toggle-target="#edit-task-<%= task.id %>">
-                      <span class="task-title" style="background: <%= classItem.textBgColor %>; color: <%= classItem.textColor %>;" ><%= task.title %></span>
+                      <span
+                        class="task-title"
+                        style="background: <%= classItem.textBgColor %>; color: <%= classItem.textColor %>;"
+                      >
+                        <%= task.title %>
+                      </span>
+
                       <% if (task.description) { %>
-                        <div class="task-description"><%= task.description.length > 70 ? task.description.substring(0, 70) + '...' : task.description %></div>
+                        <div class="task-description">
+                          <%= task.description.length > 70 ? task.description.substring(0, 70) + '...' : task.description %>
+                        </div>
                       <% } %>
+
                       <span class="task-deadline <%= task.statusClass %>"><%= task.displayDate %></span>
                     </div>
+
                     <div class="task-row-actions">
-                      <button type="button" class="btn tiny secondary" data-toggle-target="#edit-task-<%= task.id %>">Edit</button>
-                        <form action="/dashboard/action" method="post" onsubmit="return confirm('Delete this task?');" class="inline-form">
-                        <input type="hidden" name="u" value="<%= token || '' %>" />
+                      <button type="button" class="btn tiny secondary" data-toggle-target="#edit-task-<%= task.id %>">
+                        Edit
+                      </button>
+
+                      <form
+                        action="/dashboard/action"
+                        method="post"
+                        onsubmit="return confirm('Delete this task?');"
+                        class="inline-form"
+                      >
                         <input type="hidden" name="action" value="deleteTask" />
                         <input type="hidden" name="classId" value="<%= classItem.id %>" />
                         <input type="hidden" name="taskId" value="<%= task.id %>" />
@@ -105,18 +158,20 @@
                   </div>
 
                   <form id="edit-task-<%= task.id %>" class="task-edit-form hidden" action="/dashboard/action" method="post">
-                    <input type="hidden" name="u" value="<%= token || '' %>" />
                     <input type="hidden" name="action" value="updateTask" />
                     <input type="hidden" name="classId" value="<%= classItem.id %>" />
                     <input type="hidden" name="taskId" value="<%= task.id %>" />
+
                     <div class="form-row">
                       <input class="text-input" name="taskTitle" value="<%= task.title %>" />
                       <input class="text-input" type="date" name="taskDeadline" value="<%= task.deadline %>" />
                     </div>
+
                     <div class="form-row">
                       <label>Description</label>
                       <textarea class="text-input description-input" name="taskDescription" placeholder="Add a description"><%= task.description || '' %></textarea>
                     </div>
+
                     <button type="submit" class="btn small">Save task</button>
                   </form>
                 <% }); %>
@@ -126,33 +181,48 @@
             <div class="add-task-zone" aria-hidden="true"></div>
 
             <form class="task-add-form collapsed" action="/dashboard/action" method="post">
-              <input type="hidden" name="u" value="<%= token || '' %>" />
               <input type="hidden" name="action" value="addTask" />
               <input type="hidden" name="classId" value="<%= classItem.id %>" />
+
               <div class="form-row">
                 <input class="text-input" name="taskTitle" placeholder="New task" />
                 <input class="text-input" type="date" name="taskDeadline" />
               </div>
+
               <div class="form-row">
                 <label>Description</label>
                 <textarea class="text-input description-input" name="taskDescription" placeholder="Optional description"></textarea>
               </div>
+
               <button class="btn small">Add Task</button>
             </form>
 
             <form id="edit-class-<%= classItem.id %>" class="class-form hidden" action="/dashboard/action" method="post">
-              <input type="hidden" name="u" value="<%= token || '' %>" />
               <input type="hidden" name="action" value="updateClass" />
               <input type="hidden" name="classId" value="<%= classItem.id %>" />
+
               <div class="form-row">
                 <label>Class name</label>
                 <input class="text-input" name="className" value="<%= classItem.name %>" />
               </div>
+
               <div class="form-row color-row">
-                <label><span>Background</span><input type="color" name="bgColor" value="<%= classItem.bgColor %>" /></label>
-                <label><span>Text</span><input type="color" name="textColor" value="<%= classItem.textColor %>" /></label>
-                <label><span>Text background</span><input type="color" name="textBgColor" value="<%= classItem.textBgColor %>" /></label>
+                <label>
+                  <span>Background</span>
+                  <input type="color" name="bgColor" value="<%= classItem.bgColor %>" />
+                </label>
+
+                <label>
+                  <span>Text</span>
+                  <input type="color" name="textColor" value="<%= classItem.textColor %>" />
+                </label>
+
+                <label>
+                  <span>Text background</span>
+                  <input type="color" name="textBgColor" value="<%= classItem.textBgColor %>" />
+                </label>
               </div>
+
               <button class="btn small">Save class</button>
             </form>
           </section>
@@ -161,5 +231,80 @@
     </main>
 
     <script src="/dashboard.js"></script>
-  </body>
-</html>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<script>
+  const classesGrid = document.getElementById('classesGrid');
+
+  let savingOrder = false;
+
+  async function saveClassOrder() {
+    if (!classesGrid || savingOrder) return;
+
+    savingOrder = true;
+
+    const order = [...classesGrid.querySelectorAll('.class-card')]
+      .map(card => card.dataset.classId);
+
+    console.log('Saving class order:', order);
+
+    try {
+      const response = await fetch('/classes/reorder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ order })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || 'Could not save class order.');
+      }
+
+      console.log('Class order saved.');
+    } catch (err) {
+      console.error('Could not save class order:', err);
+      alert('Could not save class order. The page will reload.');
+      location.reload();
+    } finally {
+      savingOrder = false;
+    }
+  }
+
+  if (classesGrid) {
+    new Sortable(classesGrid, {
+      animation: 120,
+      handle: '.drag-handle',
+
+      // Makes drag behaviour more predictable in grid layouts
+      forceFallback: true,
+      fallbackOnBody: true,
+      fallbackTolerance: 6,
+
+      // Helps Sortable decide when to swap cards
+      swapThreshold: 0.65,
+      invertSwap: true,
+
+      ghostClass: 'class-card-ghost',
+      chosenClass: 'class-card-chosen',
+      dragClass: 'class-card-drag',
+
+      // Prevent dragging when clicking buttons/forms/tasks
+      filter: 'button, input, textarea, select, a, form, .task-row, .task-list, .task-add-form, .class-card-actions',
+      preventOnFilter: false,
+
+      onStart: () => {
+        document.body.classList.add('is-sorting-classes');
+      },
+
+      onEnd: async () => {
+        document.body.classList.remove('is-sorting-classes');
+        await saveClassOrder();
+      }
+    });
+  }
+</script>
