@@ -390,3 +390,14 @@ body.is-sorting-classes .class-card {
 body.is-sorting-classes .class-card {
   transition: none !important;
 }
+
+.login-extra-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.auth-switch-text {
+  margin-top: 12px;
+  text-align: center;
+}

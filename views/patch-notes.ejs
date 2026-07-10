@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WhatNow — Patch Notes</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+
+  <body>
+    <main class="page">
+      <section class="card patch-notes-card">
+        <div class="patch-notes-header">
+          <div>
+            <h1>WhatNow Patch Notes</h1>
+            <% if (updatedAt) { %>
+              <p class="muted-text">
+                Last updated: <%= new Date(updatedAt).toLocaleString() %>
+              </p>
+            <% } %>
+          </div>
+
+          <div class="dashboard-actions">
+            <% if (user) { %>
+              <a class="btn secondary" href="/dashboard">Back to Dashboard</a>
+            <% } else { %>
+              <a class="btn secondary" href="/">Back to Login</a>
+            <% } %>
+
+            <% if (isAdmin) { %>
+              <a class="btn" href="/patch-notes/edit">Edit Patch Notes</a>
+            <% } %>
+          </div>
+        </div>
+
+        <article class="markdown-content">
+          <%- contentHtml %>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

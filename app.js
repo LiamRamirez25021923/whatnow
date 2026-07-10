@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+const { marked } = require('marked');
+const sanitizeHtml = require('sanitize-html');
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -130,6 +132,14 @@ function requireLogin(req, res, next) {
   next();
 }
 
+function requireAdmin(req, res, next) {
+  if (!req.session || req.session.role !== 'admin') {
+    return res.status(403).send('Forbidden: only the WhatNow creator can edit patch notes.');
+  }
+
+  next();
+}
+
 function loginAndRedirect(req, res, user) {
   req.session.regenerate((err) => {
     if (err) {
@@ -139,6 +149,7 @@ function loginAndRedirect(req, res, user) {
 
     req.session.userId = user.id;
     req.session.username = user.username;
+    req.session.role = user.role;
 
     return res.redirect('/dashboard');
   });
@@ -167,7 +178,7 @@ async function createUser(username, password) {
 
 async function verifyUser(username, password) {
   const result = await pool.query(
-    `SELECT id, username, password_salt, password_hash
+    `SELECT id, username, role, password_salt, password_hash
      FROM users
      WHERE username = $1`,
     [username]
@@ -193,7 +204,8 @@ async function verifyUser(username, password) {
 
   return {
     id: user.id,
-    username: user.username
+    username: user.username,
+    role: user.role
   };
 }
 
@@ -302,6 +314,50 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
+function sanitizePatchNotesHtml(html) {
+  return sanitizeHtml(html, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      'h1',
+      'h2',
+      'h3',
+      'span',
+      'u'
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      span: ['style'],
+      '*': ['class']
+    },
+    allowedStyles: {
+      span: {
+        color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\((\s*\d+\s*,){2}\s*\d+\s*\)$/]
+      }
+    }
+  });
+}
+
+async function getPatchNotes() {
+  const result = await pool.query(
+    `SELECT content, updated_at
+     FROM patch_notes
+     WHERE id = 1`
+  );
+
+  return result.rows[0];
+}
+
+async function savePatchNotes(content, userId) {
+  await pool.query(
+    `UPDATE patch_notes
+     SET content = $1,
+         updated_at = now(),
+         updated_by = $2
+     WHERE id = 1`,
+    [content, userId]
+  );
+}
+
+//--ALL ROUTES UNDER HERE--//
 app.get('/', (req, res) => {
   if (req.session && req.session.userId) {
     return res.redirect('/dashboard');
@@ -718,6 +774,68 @@ app.use((err, req, res, next) => {
   });
 
   res.status(500).send('Internal Server Error - check Render logs');
+});
+
+app.get('/patch-notes', async (req, res) => {
+  try {
+    const patchNotes = await getPatchNotes();
+
+    const rawHtml = marked.parse(patchNotes.content);
+    const safeHtml = sanitizePatchNotesHtml(rawHtml);
+
+    res.render('patch-notes', {
+      user: req.session ? req.session.username : null,
+      isAdmin: req.session && req.session.role === 'admin',
+      contentHtml: safeHtml,
+      updatedAt: patchNotes.updated_at
+    });
+  } catch (err) {
+    console.error('[PATCH NOTES VIEW ERROR]', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+
+    res.status(500).send('Could not load patch notes.');
+  }
+});
+
+app.get('/patch-notes/edit', requireLogin, requireAdmin, async (req, res) => {
+  try {
+    const patchNotes = await getPatchNotes();
+
+    res.render('patch-notes-edit', {
+      user: req.session.username,
+      content: patchNotes.content,
+      error: null
+    });
+  } catch (err) {
+    console.error('[PATCH NOTES EDIT LOAD ERROR]', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+
+    res.status(500).send('Could not load patch notes editor.');
+  }
+});
+
+app.post('/patch-notes/edit', requireLogin, requireAdmin, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    await savePatchNotes(content || '', req.session.userId);
+
+    res.redirect('/patch-notes');
+  } catch (err) {
+    console.error('[PATCH NOTES SAVE ERROR]', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+
+    res.status(500).send('Could not save patch notes.');
+  }
 });
 
 app.listen(port, () => {

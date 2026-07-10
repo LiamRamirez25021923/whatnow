@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WhatNow — Edit Patch Notes</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+
+  <body>
+    <main class="page">
+      <section class="card patch-notes-card">
+        <div class="patch-notes-header">
+          <div>
+            <h1>Edit Patch Notes</h1>
+            <p class="muted-text">Signed in as <%= user %></p>
+          </div>
+
+          <div class="dashboard-actions">
+            <a class="btn secondary" href="/patch-notes">Cancel</a>
+          </div>
+        </div>
+
+        <% if (error) { %>
+          <div class="message-banner error-banner"><%= error %></div>
+        <% } %>
+
+        <div class="editor-toolbar">
+          <button type="button" data-insert="# ">Large Header</button>
+          <button type="button" data-insert="## ">Medium Header</button>
+          <button type="button" data-wrap="**">Bold</button>
+          <button type="button" data-wrap="*">Italic</button>
+          <button type="button" data-wrap="<u>|</u>">Underline</button>
+          <button type="button" data-wrap="<span style=&quot;color:#ff5c7a&quot;>|</span>">Pink Text</button>
+          <button type="button" data-wrap="<span style=&quot;color:#4f46e5&quot;>|</span>">Blue Text</button>
+          <button type="button" data-insert="- ">Bullet</button>
+        </div>
+
+        <form action="/patch-notes/edit" method="post" class="patch-editor-form">
+          <textarea
+            id="patchNotesEditor"
+            class="text-input patch-editor"
+            name="content"
+            spellcheck="true"
+          ><%= content %></textarea>
+
+          <div class="dashboard-actions">
+            <button class="btn" type="submit">Save Patch Notes</button>
+            <a class="btn secondary" href="/patch-notes">Cancel</a>
+          </div>
+        </form>
+
+        <section class="markdown-help">
+          <h2>Formatting Guide</h2>
+          <pre>
+# Version 1.2.0
+
+## New Features
+
+- Added patch notes page.
+- Improved class ordering.
+
+### Smaller Notes
+
+This is **bold**.
+This is *italic*.
+<span style="color:#ff5c7a">This is colored text.</span>
+          </pre>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const editor = document.getElementById('patchNotesEditor');
+
+      function insertAtCursor(text) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const before = editor.value.substring(0, start);
+        const selected = editor.value.substring(start, end);
+        const after = editor.value.substring(end);
+
+        editor.value = before + text + selected + after;
+        editor.focus();
+        editor.selectionStart = editor.selectionEnd = start + text.length + selected.length;
+      }
+
+      function wrapSelection(wrapper) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const before = editor.value.substring(0, start);
+        const selected = editor.value.substring(start, end) || 'text';
+        const after = editor.value.substring(end);
+
+        let finalText;
+
+        if (wrapper.includes('|')) {
+          finalText = wrapper.replace('|', selected);
+        } else {
+          finalText = wrapper + selected + wrapper;
+        }
+
+        editor.value = before + finalText + after;
+        editor.focus();
+        editor.selectionStart = start;
+        editor.selectionEnd = start + finalText.length;
+      }
+
+      document.querySelectorAll('[data-insert]').forEach(button => {
+        button.addEventListener('click', () => {
+          insertAtCursor(button.dataset.insert);
+        });
+      });
+
+      document.querySelectorAll('[data-wrap]').forEach(button => {
+        button.addEventListener('click', () => {
+          wrapSelection(button.dataset.wrap);
+        });
+      });
+    </script>
+  </body>
+</html>
