@@ -57,6 +57,42 @@
             </label>
           </div>
 
+          <fieldset class="deadline-color-editor">
+            <legend>Deadline indicator colors</legend>
+
+            <div class="deadline-color-grid">
+              <label>
+                <span>Overdue</span>
+                <input type="color" name="deadlineOverdueColor" value="#7c3aed" />
+              </label>
+
+              <label>
+                <span>Today</span>
+                <input type="color" name="deadlineTodayColor" value="#dc2626" />
+              </label>
+
+              <label>
+                <span>Tomorrow</span>
+                <input type="color" name="deadlineTomorrowColor" value="#dc2626" />
+              </label>
+
+              <label>
+                <span>Overmorrow</span>
+                <input type="color" name="deadlineOvermorrowColor" value="#d4a300" />
+              </label>
+
+              <label>
+                <span>Future</span>
+                <input type="color" name="deadlineFutureColor" value="#15803d" />
+              </label>
+
+              <label>
+                <span>No deadline</span>
+                <input type="color" name="deadlineNoneColor" value="#cbd5e1" />
+              </label>
+            </div>
+          </fieldset>
+
           <button type="submit" class="btn">Create class</button>
         </form>
 
@@ -92,7 +128,7 @@
             <div class="class-card-header">
               <div class="class-title-area">
                 <button type="button" class="drag-handle" title="Drag to reorder" aria-label="Drag class">
-                  ☷
+                  ⋮⋮
                 </button>
 
                 <h2><%= classItem.name %></h2>
@@ -136,7 +172,12 @@
                         </div>
                       <% } %>
 
-                      <span class="task-deadline <%= task.statusClass %>"><%= task.displayDate %></span>
+                      <span
+                        class="task-deadline <%= task.statusClass %>"
+                        style="background: <%= task.statusColor %>; color: <%= task.statusTextColor %>;"
+                      >
+                        <%= task.displayDate %>
+                      </span>
                     </div>
 
                     <div class="task-row-actions">
@@ -223,6 +264,42 @@
                   <input type="color" name="textBgColor" value="<%= classItem.textBgColor %>" />
                 </label>
               </div>
+
+              <fieldset class="deadline-color-editor">
+                <legend>Deadline indicator colors</legend>
+
+                <div class="deadline-color-grid">
+                  <label>
+                    <span>Overdue</span>
+                    <input type="color" name="deadlineOverdueColor" value="<%= classItem.deadlineColors.overdue %>" />
+                  </label>
+
+                  <label>
+                    <span>Today</span>
+                    <input type="color" name="deadlineTodayColor" value="<%= classItem.deadlineColors.today %>" />
+                  </label>
+
+                  <label>
+                    <span>Tomorrow</span>
+                    <input type="color" name="deadlineTomorrowColor" value="<%= classItem.deadlineColors.tomorrow %>" />
+                  </label>
+
+                  <label>
+                    <span>Overmorrow</span>
+                    <input type="color" name="deadlineOvermorrowColor" value="<%= classItem.deadlineColors.overmorrow %>" />
+                  </label>
+
+                  <label>
+                    <span>Future</span>
+                    <input type="color" name="deadlineFutureColor" value="<%= classItem.deadlineColors.future %>" />
+                  </label>
+
+                  <label>
+                    <span>No deadline</span>
+                    <input type="color" name="deadlineNoneColor" value="<%= classItem.deadlineColors.none %>" />
+                  </label>
+                </div>
+              </fieldset>
 
               <button class="btn small">Save class</button>
             </form>

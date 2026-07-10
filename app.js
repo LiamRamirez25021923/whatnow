@@ -11,6 +11,25 @@ const pool = require('./db');
 const app = express();
 const port = process.env.PORT || 3002;
 
+const DEFAULT_DEADLINE_COLORS = {
+  overdue: '#7c3aed',
+  today: '#dc2626',
+  tomorrow: '#dc2626',
+  overmorrow: '#d4a300',
+  future: '#15803d',
+  none: '#cbd5e1'
+};
+
+const DEFAULT_PATCH_NOTES = `# WhatNow Patch Notes
+
+## Version 1.0.0
+
+### New Features
+
+- Patch notes page added.
+
+Small description text goes here.`;
+
 process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
 });
@@ -59,6 +78,38 @@ function formatCurrentDate(date) {
   }).format(date);
 }
 
+function normalizeHexColor(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+
+  const trimmed = value.trim();
+
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return fallback;
+}
+
+function getReadableTextColor(backgroundColor) {
+  if (!backgroundColor || typeof backgroundColor !== 'string') {
+    return '#ffffff';
+  }
+
+  const hex = backgroundColor.replace('#', '');
+
+  if (hex.length !== 6) {
+    return '#ffffff';
+  }
+
+  const red = parseInt(hex.substring(0, 2), 16);
+  const green = parseInt(hex.substring(2, 4), 16);
+  const blue = parseInt(hex.substring(4, 6), 16);
+
+  const brightness = (red * 299 + green * 587 + blue * 114) / 1000;
+
+  return brightness >= 150 ? '#3d1f0f' : '#ffffff';
+}
+
 function attachTaskStatuses(classes) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -66,11 +117,17 @@ function attachTaskStatuses(classes) {
   return classes.map(classItem => ({
     ...classItem,
     tasks: classItem.tasks.map(task => {
+      const deadlineColors = classItem.deadlineColors || DEFAULT_DEADLINE_COLORS;
+
       if (!task.deadline) {
+        const statusColor = deadlineColors.none;
+
         return {
           ...task,
           statusClass: 'deadline-none',
-          displayDate: 'take your time'
+          displayDate: 'take your time',
+          statusColor,
+          statusTextColor: getReadableTextColor(statusColor)
         };
       }
 
@@ -79,31 +136,39 @@ function attachTaskStatuses(classes) {
 
       let statusClass = 'deadline-future';
       let displayDate = task.deadline;
+      let statusColor = deadlineColors.future;
 
       if (diffDays < 0) {
         statusClass = 'deadline-overdue';
         displayDate = `Overdue · ${task.deadline}`;
+        statusColor = deadlineColors.overdue;
       } else if (diffDays === 0) {
         statusClass = 'deadline-soon';
         displayDate = 'Today';
+        statusColor = deadlineColors.today;
       } else if (diffDays === 1) {
         statusClass = 'deadline-soon';
         displayDate = 'Tomorrow';
+        statusColor = deadlineColors.tomorrow;
       } else if (diffDays === 2) {
         statusClass = 'deadline-overmorrow';
         displayDate = 'Overmorrow';
+        statusColor = deadlineColors.overmorrow;
       } else {
         statusClass = 'deadline-future';
         displayDate = new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric'
         }).format(deadlineDate);
+        statusColor = deadlineColors.future;
       }
 
       return {
         ...task,
         statusClass,
-        displayDate
+        displayDate,
+        statusColor,
+        statusTextColor: getReadableTextColor(statusColor)
       };
     })
   }));
@@ -252,7 +317,17 @@ async function changeUserPassword(userId, currentPassword, newPassword) {
 
 async function loadUserClasses(userId) {
   const classesResult = await pool.query(
-    `SELECT id, name, bg_color, text_color, text_bg_color
+    `SELECT id,
+            name,
+            bg_color,
+            text_color,
+            text_bg_color,
+            deadline_overdue_color,
+            deadline_today_color,
+            deadline_tomorrow_color,
+            deadline_overmorrow_color,
+            deadline_future_color,
+            deadline_none_color
      FROM classes
      WHERE user_id = $1
      ORDER BY sort_order ASC, created_at ASC`,
@@ -276,6 +351,14 @@ async function loadUserClasses(userId) {
       bgColor: classRow.bg_color,
       textColor: classRow.text_color,
       textBgColor: classRow.text_bg_color,
+      deadlineColors: {
+        overdue: normalizeHexColor(classRow.deadline_overdue_color, DEFAULT_DEADLINE_COLORS.overdue),
+        today: normalizeHexColor(classRow.deadline_today_color, DEFAULT_DEADLINE_COLORS.today),
+        tomorrow: normalizeHexColor(classRow.deadline_tomorrow_color, DEFAULT_DEADLINE_COLORS.tomorrow),
+        overmorrow: normalizeHexColor(classRow.deadline_overmorrow_color, DEFAULT_DEADLINE_COLORS.overmorrow),
+        future: normalizeHexColor(classRow.deadline_future_color, DEFAULT_DEADLINE_COLORS.future),
+        none: normalizeHexColor(classRow.deadline_none_color, DEFAULT_DEADLINE_COLORS.none)
+      },
       tasks: tasksResult.rows.map(task => ({
         id: task.id,
         title: task.title,
@@ -287,6 +370,70 @@ async function loadUserClasses(userId) {
 
   return classes;
 }
+
+function sanitizePatchNotesHtml(html) {
+  return sanitizeHtml(html, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      'h1',
+      'h2',
+      'h3',
+      'span',
+      'u',
+      'pre',
+      'code',
+      'blockquote'
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      a: ['href', 'name', 'target', 'rel'],
+      span: ['style'],
+      '*': ['class']
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedStyles: {
+      span: {
+        color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\((\s*\d+\s*,){2}\s*\d+\s*\)$/]
+      }
+    }
+  });
+}
+
+async function getPatchNotes() {
+  const result = await pool.query(
+    `SELECT patch_notes.content,
+            patch_notes.updated_at,
+            users.username AS updated_by_username
+     FROM patch_notes
+     LEFT JOIN users
+     ON patch_notes.updated_by = users.id
+     WHERE patch_notes.id = 1`
+  );
+
+  if (!result.rows[0]) {
+    return {
+      content: DEFAULT_PATCH_NOTES,
+      updated_at: null,
+      updated_by_username: null
+    };
+  }
+
+  return result.rows[0];
+}
+
+async function savePatchNotes(content, userId) {
+  await pool.query(
+    `INSERT INTO patch_notes (id, content, updated_at, updated_by)
+     VALUES (1, $1, now(), $2)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       content = EXCLUDED.content,
+       updated_at = now(),
+       updated_by = $2`,
+    [content, userId]
+  );
+}
+
+// -------------------- ROUTES --------------------
 
 app.get('/health/db', async (req, res) => {
   try {
@@ -314,50 +461,6 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
-function sanitizePatchNotesHtml(html) {
-  return sanitizeHtml(html, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      'h1',
-      'h2',
-      'h3',
-      'span',
-      'u'
-    ]),
-    allowedAttributes: {
-      ...sanitizeHtml.defaults.allowedAttributes,
-      span: ['style'],
-      '*': ['class']
-    },
-    allowedStyles: {
-      span: {
-        color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\((\s*\d+\s*,){2}\s*\d+\s*\)$/]
-      }
-    }
-  });
-}
-
-async function getPatchNotes() {
-  const result = await pool.query(
-    `SELECT content, updated_at
-     FROM patch_notes
-     WHERE id = 1`
-  );
-
-  return result.rows[0];
-}
-
-async function savePatchNotes(content, userId) {
-  await pool.query(
-    `UPDATE patch_notes
-     SET content = $1,
-         updated_at = now(),
-         updated_by = $2
-     WHERE id = 1`,
-    [content, userId]
-  );
-}
-
-//--ALL ROUTES UNDER HERE--//
 app.get('/', (req, res) => {
   if (req.session && req.session.userId) {
     return res.redirect('/dashboard');
@@ -564,6 +667,12 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
       bgColor,
       textColor,
       textBgColor,
+      deadlineOverdueColor,
+      deadlineTodayColor,
+      deadlineTomorrowColor,
+      deadlineOvermorrowColor,
+      deadlineFutureColor,
+      deadlineNoneColor,
       taskTitle,
       taskDeadline,
       taskDescription,
@@ -578,29 +687,54 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
       case 'createClass': {
         await pool.query(
           `INSERT INTO classes
-          (user_id, name, bg_color, text_color, text_bg_color, sort_order)
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            COALESCE(
-              (SELECT MAX(sort_order) + 1 FROM classes WHERE user_id = $1),
-              0
-            )
-          )`,
+           (
+             user_id,
+             name,
+             bg_color,
+             text_color,
+             text_bg_color,
+             deadline_overdue_color,
+             deadline_today_color,
+             deadline_tomorrow_color,
+             deadline_overmorrow_color,
+             deadline_future_color,
+             deadline_none_color,
+             sort_order
+           )
+           VALUES (
+             $1,
+             $2,
+             $3,
+             $4,
+             $5,
+             $6,
+             $7,
+             $8,
+             $9,
+             $10,
+             $11,
+             COALESCE(
+               (SELECT MAX(sort_order) + 1 FROM classes WHERE user_id = $1),
+               0
+             )
+           )`,
           [
             userId,
             (className || 'New class').trim() || 'New class',
             bgColor || '#ff9898',
             textColor || '#3d1f0f',
-            textBgColor || '#ffffff'
-    ]
-  );
+            textBgColor || '#ffffff',
+            normalizeHexColor(deadlineOverdueColor, DEFAULT_DEADLINE_COLORS.overdue),
+            normalizeHexColor(deadlineTodayColor, DEFAULT_DEADLINE_COLORS.today),
+            normalizeHexColor(deadlineTomorrowColor, DEFAULT_DEADLINE_COLORS.tomorrow),
+            normalizeHexColor(deadlineOvermorrowColor, DEFAULT_DEADLINE_COLORS.overmorrow),
+            normalizeHexColor(deadlineFutureColor, DEFAULT_DEADLINE_COLORS.future),
+            normalizeHexColor(deadlineNoneColor, DEFAULT_DEADLINE_COLORS.none)
+          ]
+        );
 
-  break;
-}
+        break;
+      }
 
       case 'updateClass': {
         await pool.query(
@@ -608,14 +742,26 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
            SET name = $1,
                bg_color = $2,
                text_color = $3,
-               text_bg_color = $4
-           WHERE id = $5
-           AND user_id = $6`,
+               text_bg_color = $4,
+               deadline_overdue_color = COALESCE($5, deadline_overdue_color),
+               deadline_today_color = COALESCE($6, deadline_today_color),
+               deadline_tomorrow_color = COALESCE($7, deadline_tomorrow_color),
+               deadline_overmorrow_color = COALESCE($8, deadline_overmorrow_color),
+               deadline_future_color = COALESCE($9, deadline_future_color),
+               deadline_none_color = COALESCE($10, deadline_none_color)
+           WHERE id = $11
+           AND user_id = $12`,
           [
             (className || 'Untitled class').trim() || 'Untitled class',
             bgColor || '#ff9898',
             textColor || '#3d1f0f',
             textBgColor || '#ffffff',
+            normalizeHexColor(deadlineOverdueColor, null),
+            normalizeHexColor(deadlineTodayColor, null),
+            normalizeHexColor(deadlineTomorrowColor, null),
+            normalizeHexColor(deadlineOvermorrowColor, null),
+            normalizeHexColor(deadlineFutureColor, null),
+            normalizeHexColor(deadlineNoneColor, null),
             classId,
             userId
           ]
@@ -699,28 +845,6 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
         break;
       }
 
-      case 'reorderClasses': {
-        try {
-          const order = JSON.parse(req.body.classOrder || '[]');
-
-          if (Array.isArray(order)) {
-            for (let i = 0; i < order.length; i++) {
-              await pool.query(
-                `UPDATE classes
-                 SET sort_order = $1
-                 WHERE id = $2
-                 AND user_id = $3`,
-                [i, order[i], userId]
-              );
-            }
-          }
-        } catch (err) {
-          console.error('[REORDER ERROR]', err.message);
-        }
-
-        break;
-      }
-
       case 'changePassword': {
         if (!currentPassword || !newPassword || !confirmPassword) {
           return res.redirect(`/dashboard?error=${encodeURIComponent('Please fill in all password fields.')}`);
@@ -757,42 +881,26 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
   }
 });
 
-app.get('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie('connect.sid');
-    res.redirect('/');
-  });
-});
-
-app.use((err, req, res, next) => {
-  console.error('[UNHANDLED ERROR]', {
-    method: req.method,
-    url: req.originalUrl,
-    message: err.message,
-    code: err.code,
-    stack: err.stack
-  });
-
-  res.status(500).send('Internal Server Error - check Render logs');
-});
-
 app.get('/patch-notes', async (req, res) => {
   try {
     const patchNotes = await getPatchNotes();
 
-    const rawHtml = marked.parse(patchNotes.content);
+    const rawHtml = marked.parse(patchNotes.content || DEFAULT_PATCH_NOTES);
     const safeHtml = sanitizePatchNotesHtml(rawHtml);
 
     res.render('patch-notes', {
       user: req.session ? req.session.username : null,
-      isAdmin: req.session && req.session.role === 'admin',
+      isAdmin: Boolean(req.session && req.session.role === 'admin'),
       contentHtml: safeHtml,
-      updatedAt: patchNotes.updated_at
+      updatedAt: patchNotes.updated_at,
+      updatedBy: patchNotes.updated_by_username
     });
   } catch (err) {
     console.error('[PATCH NOTES VIEW ERROR]', {
       message: err.message,
       code: err.code,
+      detail: err.detail,
+      hint: err.hint,
       stack: err.stack
     });
 
@@ -806,13 +914,15 @@ app.get('/patch-notes/edit', requireLogin, requireAdmin, async (req, res) => {
 
     res.render('patch-notes-edit', {
       user: req.session.username,
-      content: patchNotes.content,
+      content: patchNotes.content || DEFAULT_PATCH_NOTES,
       error: null
     });
   } catch (err) {
     console.error('[PATCH NOTES EDIT LOAD ERROR]', {
       message: err.message,
       code: err.code,
+      detail: err.detail,
+      hint: err.hint,
       stack: err.stack
     });
 
@@ -831,11 +941,32 @@ app.post('/patch-notes/edit', requireLogin, requireAdmin, async (req, res) => {
     console.error('[PATCH NOTES SAVE ERROR]', {
       message: err.message,
       code: err.code,
+      detail: err.detail,
+      hint: err.hint,
       stack: err.stack
     });
 
     res.status(500).send('Could not save patch notes.');
   }
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie('connect.sid');
+    res.redirect('/');
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error('[UNHANDLED ERROR]', {
+    method: req.method,
+    url: req.originalUrl,
+    message: err.message,
+    code: err.code,
+    stack: err.stack
+  });
+
+  res.status(500).send('Internal Server Error - check Render logs');
 });
 
 app.listen(port, () => {
