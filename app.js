@@ -1,4 +1,16 @@
 require('dotenv').config({ override: true });
+try {
+  const url = new URL(process.env.DATABASE_URL);
+
+  console.log('[DB CONFIG]', {
+    host: url.hostname,
+    port: url.port,
+    username: decodeURIComponent(url.username),
+    database: url.pathname
+  });
+} catch (error) {
+  console.error('[DB CONFIG ERROR]', error.message);
+}
 
 const { marked } = require('marked');
 const sanitizeHtml = require('sanitize-html');
