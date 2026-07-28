@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 const { marked } = require('marked');
 const sanitizeHtml = require('sanitize-html');
@@ -12,12 +12,12 @@ const app = express();
 const port = process.env.PORT || 3002;
 
 const DEFAULT_DEADLINE_COLORS = {
-  overdue: '#7c3aed',
+  overdue: '#ff7e89',
   today: '#dc2626',
   tomorrow: '#dc2626',
   overmorrow: '#d4a300',
-  future: '#15803d',
-  none: '#cbd5e1'
+  future: '#52b275',
+  none: '#a8b6c8'
 };
 
 const DEFAULT_PATCH_NOTES = `# WhatNow Patch Notes
@@ -29,6 +29,13 @@ const DEFAULT_PATCH_NOTES = `# WhatNow Patch Notes
 - Patch notes page added.
 
 Small description text goes here.`;
+
+
+const DEFAULT_CONTACT_CONTENT = `# Contact Us
+
+placeholder
+
+**Email:** placeholder`;
 
 process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
@@ -430,6 +437,53 @@ async function savePatchNotes(content, userId) {
        updated_at = now(),
        updated_by = $2`,
     [content, userId]
+  );
+}
+
+
+async function ensureSiteContentTable() {
+  // Keep this table independent from the users table. Older WhatNow databases
+  // may use different data types for users.id, which made the Contact Us page
+  // fail while PostgreSQL tried to create its foreign key.
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS site_content (
+       content_key VARCHAR(80) PRIMARY KEY,
+       content TEXT NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_by_username VARCHAR(120)
+     )`
+  );
+}
+
+async function getSiteContent(contentKey, fallback) {
+  await ensureSiteContentTable();
+
+  const result = await pool.query(
+    `SELECT content, updated_at, updated_by_username
+     FROM site_content
+     WHERE content_key = $1`,
+    [contentKey]
+  );
+
+  return result.rows[0] || {
+    content: fallback,
+    updated_at: null,
+    updated_by_username: null
+  };
+}
+
+async function saveSiteContent(contentKey, content, username) {
+  await ensureSiteContentTable();
+
+  await pool.query(
+    `INSERT INTO site_content (content_key, content, updated_at, updated_by_username)
+     VALUES ($1, $2, now(), $3)
+     ON CONFLICT (content_key)
+     DO UPDATE SET
+       content = EXCLUDED.content,
+       updated_at = now(),
+       updated_by_username = EXCLUDED.updated_by_username`,
+    [contentKey, content, username]
   );
 }
 
@@ -947,6 +1001,50 @@ app.post('/patch-notes/edit', requireLogin, requireAdmin, async (req, res) => {
     });
 
     res.status(500).send('Could not save patch notes.');
+  }
+});
+
+
+app.get('/contact', async (req, res) => {
+  try {
+    const contact = await getSiteContent('contact', DEFAULT_CONTACT_CONTENT);
+    const rawHtml = marked.parse(contact.content || DEFAULT_CONTACT_CONTENT);
+    const safeHtml = sanitizePatchNotesHtml(rawHtml);
+
+    res.render('contact', {
+      user: req.session ? req.session.username : null,
+      isAdmin: Boolean(req.session && req.session.role === 'admin'),
+      contentHtml: safeHtml,
+      updatedAt: contact.updated_at,
+      updatedBy: contact.updated_by_username
+    });
+  } catch (err) {
+    console.error('[CONTACT VIEW ERROR]', err);
+    res.status(500).send('Could not load Contact Us.');
+  }
+});
+
+app.get('/contact/edit', requireLogin, requireAdmin, async (req, res) => {
+  try {
+    const contact = await getSiteContent('contact', DEFAULT_CONTACT_CONTENT);
+    res.render('contact-edit', {
+      user: req.session.username,
+      content: contact.content || DEFAULT_CONTACT_CONTENT,
+      error: null
+    });
+  } catch (err) {
+    console.error('[CONTACT EDIT LOAD ERROR]', err);
+    res.status(500).send('Could not load Contact Us editor.');
+  }
+});
+
+app.post('/contact/edit', requireLogin, requireAdmin, async (req, res) => {
+  try {
+    await saveSiteContent('contact', req.body.content || '', req.session.username);
+    res.redirect('/contact');
+  } catch (err) {
+    console.error('[CONTACT SAVE ERROR]', err);
+    res.status(500).send('Could not save Contact Us.');
   }
 });
 

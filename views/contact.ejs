@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WhatNow — Contact Us</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon_io/favicon-32x32.png?v=3">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon_io/favicon-16x16.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon_io/apple-touch-icon.png?v=3">
+  <link rel="manifest" href="/images/favicon_io/site.webmanifest?v=3">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="card content-page">
+      <div class="patch-notes-header">
+        <div><p class="eyebrow">WHATNOW</p><h1>Contact Us</h1><% if (updatedAt) { %><p class="muted-text">Last updated <%= new Date(updatedAt).toLocaleString() %><% if (updatedBy) { %> by <%= updatedBy %><% } %></p><% } %></div>
+        <div class="content-actions">
+          <a class="pixel-button" href="<%= user ? '/dashboard' : '/' %>"><%= user ? 'Back to Dashboard' : 'Back to Login' %></a>
+          <% if (isAdmin) { %><a class="pixel-button primary" href="/contact/edit">Edit Contact Page</a><% } %>
+        </div>
+      </div>
+      <article class="markdown-content"><%- contentHtml %></article>
+    </section>
+  </main>
+  <script src="/theme.js"></script>
+  <script src="/ui-sounds.js"></script>
+</body>
+</html>

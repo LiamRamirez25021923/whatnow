@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WhatNow — Edit Contact Us</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon_io/favicon-32x32.png?v=3">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon_io/favicon-16x16.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon_io/apple-touch-icon.png?v=3">
+  <link rel="manifest" href="/images/favicon_io/site.webmanifest?v=3">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="card content-page">
+      <p class="eyebrow">ADMIN</p><h1>Edit Contact Us</h1><p class="muted-text">Signed in as <%= user %>. Markdown is supported.</p>
+      <% if (error) { %><div class="message-banner error-banner"><%= error %></div><% } %>
+      <form action="/contact/edit" method="post" class="class-form">
+        <textarea class="text-input editor-textarea" name="content" spellcheck="true"><%= content %></textarea>
+        <div class="content-actions"><button class="pixel-button primary" type="submit">Save Contact Page</button><a class="pixel-button" href="/contact">Cancel</a></div>
+      </form>
+    </section>
+  </main>
+  <script src="/theme.js"></script>
+  <script src="/ui-sounds.js"></script>
+</body>
+</html>
