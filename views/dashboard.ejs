@@ -1,314 +1,181 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WhatNow — Dashboard</title>
-    <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
-    <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="/styles.css">
-  </head>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhatNow — Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon_io/favicon-32x32.png?v=3">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon_io/favicon-16x16.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon_io/apple-touch-icon.png?v=3">
+  <link rel="manifest" href="/images/favicon_io/site.webmanifest?v=3">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page dashboard-page" data-user="<%= user %>">
+    <header class="dashboard-header pixel-panel">
+      <div>
+        <p class="eyebrow">WHATNOW</p>
+        <h1>Welcome, <%= user %>!</h1>
+        <p class="dashboard-date"><%= currentDate %></p>
+      </div>
+      <button class="theme-toggle pixel-button icon-button" type="button" id="themeToggle" aria-label="Toggle light and dark mode" title="Toggle theme">
+        <span class="theme-icon-light" aria-hidden="true">☀</span>
+        <span class="theme-icon-dark" aria-hidden="true">☾</span>
+      </button>
+    </header>
 
-  <body>
-    <main class="page dashboard-page" data-user="<%= user %>">
-      <header class="dashboard-header">
-        <div class="dashboard-welcome">Welcome, <%= user %>!</div>
-        <div class="dashboard-date"><%= currentDate %></div>
-      </header>
+    <% if (error) { %><div class="message-banner error-banner"><%= error %></div><% } %>
+    <% if (message) { %><div class="message-banner success-banner"><%= message %></div><% } %>
 
-      <section class="card dashboard-card">
-        <div class="dashboard-actions">
-          <button type="button" class="btn secondary" data-toggle-target="#new-class-form">+ Create Class</button>
-          <button type="button" class="btn secondary" data-toggle-target="#password-form">Change Password</button>
-          <a class="btn secondary" href="/patch-notes">Patch Notes</a>
-          <a class="btn logout" href="/logout">Log out</a>
+    <section class="jiggly-shell" aria-label="WhatNow navigation">
+      <button class="jiggly-button" id="jigglyButton" type="button" aria-controls="jigglyDrawer" aria-expanded="false" title="Open Jiggly drawer">
+        <img src="/images/jiggly.png" alt="Jiggly" draggable="false">
+      </button>
+
+      <aside class="jiggly-drawer pixel-panel" id="jigglyDrawer" aria-hidden="true">
+        <div class="drawer-calendar" id="drawerCalendar">
+          <div class="calendar-header">
+            <button class="pixel-button tiny calendar-nav" type="button" data-calendar-direction="-1" aria-label="Previous month">◀</button>
+            <h2 id="calendarMonthLabel">Calendar</h2>
+            <button class="pixel-button tiny calendar-nav" type="button" data-calendar-direction="1" aria-label="Next month">▶</button>
+          </div>
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <p class="calendar-key"><span class="calendar-dot"></span> Task due</p>
         </div>
 
-        <% if (error) { %>
-          <div class="message-banner error-banner"><%= error %></div>
-        <% } %>
+        <nav class="drawer-actions" aria-label="Dashboard actions">
+          <button type="button" class="pixel-button" data-drawer-section="calendar">Calendar</button>
+          <button type="button" class="pixel-button" data-toggle-target="#new-class-form">Create Class</button>
+          <button type="button" class="pixel-button" data-toggle-target="#password-form">Change Password</button>
+          <a class="pixel-button" href="/patch-notes">Patch Notes</a>
+          <a class="pixel-button" href="/contact">Contact Us</a>
+          <a class="pixel-button danger" href="/logout">Log Out</a>
+        </nav>
+      </aside>
+    </section>
 
-        <% if (message) { %>
-          <div class="message-banner success-banner"><%= message %></div>
-        <% } %>
-
-        <form id="new-class-form" class="class-form hidden" action="/dashboard/action" method="post">
-          <input type="hidden" name="action" value="createClass" />
-
-          <div class="form-row">
-            <label>Class name</label>
-            <input class="text-input" name="className" placeholder="Example: C327 Software App Development" />
+    <section class="dashboard-tools pixel-panel">
+      <form id="new-class-form" class="class-form hidden" action="/dashboard/action" method="post">
+        <input type="hidden" name="action" value="createClass" />
+        <h2>Create a class</h2>
+        <div class="form-row"><label>Class name</label><input class="text-input" name="className" placeholder="Example: C327 Software App Development" /></div>
+        <div class="form-row color-row">
+          <label><span>Background</span><input type="color" name="bgColor" value="#ff9aa2" /></label>
+          <label><span>Text</span><input type="color" name="textColor" value="#4d2c17" /></label>
+          <label><span>Text background</span><input type="color" name="textBgColor" value="#ffffff" /></label>
+        </div>
+        <fieldset class="deadline-color-editor">
+          <legend>Deadline indicator colors</legend>
+          <div class="deadline-color-grid">
+            <label><span>Overdue</span><input type="color" name="deadlineOverdueColor" value="#7c3aed" /></label>
+            <label><span>Today</span><input type="color" name="deadlineTodayColor" value="#dc2626" /></label>
+            <label><span>Tomorrow</span><input type="color" name="deadlineTomorrowColor" value="#dc2626" /></label>
+            <label><span>Overmorrow</span><input type="color" name="deadlineOvermorrowColor" value="#d4a300" /></label>
+            <label><span>Future</span><input type="color" name="deadlineFutureColor" value="#15803d" /></label>
+            <label><span>No deadline</span><input type="color" name="deadlineNoneColor" value="#cbd5e1" /></label>
           </div>
+        </fieldset>
+        <button type="submit" class="pixel-button primary">Create Class</button>
+      </form>
 
-          <div class="form-row color-row">
-            <label>
-              <span>Background</span>
-              <input type="color" name="bgColor" value="#ff9aa2" />
-            </label>
+      <form id="password-form" class="class-form hidden" action="/dashboard/action" method="post">
+        <input type="hidden" name="action" value="changePassword" />
+        <h2>Change password</h2>
+        <div class="form-row"><label>Current password</label><input class="text-input" type="password" name="currentPassword" /></div>
+        <div class="form-row"><label>New password</label><input class="text-input" type="password" name="newPassword" /></div>
+        <div class="form-row"><label>Confirm new password</label><input class="text-input" type="password" name="confirmPassword" /></div>
+        <button type="submit" class="pixel-button primary">Save Password</button>
+      </form>
+    </section>
 
-            <label>
-              <span>Text</span>
-              <input type="color" name="textColor" value="#4d2c17" />
-            </label>
-
-            <label>
-              <span>Text background</span>
-              <input type="color" name="textBgColor" value="#ffffff" />
-            </label>
-          </div>
-
-          <fieldset class="deadline-color-editor">
-            <legend>Deadline indicator colors</legend>
-
-            <div class="deadline-color-grid">
-              <label>
-                <span>Overdue</span>
-                <input type="color" name="deadlineOverdueColor" value="#7c3aed" />
-              </label>
-
-              <label>
-                <span>Today</span>
-                <input type="color" name="deadlineTodayColor" value="#dc2626" />
-              </label>
-
-              <label>
-                <span>Tomorrow</span>
-                <input type="color" name="deadlineTomorrowColor" value="#dc2626" />
-              </label>
-
-              <label>
-                <span>Overmorrow</span>
-                <input type="color" name="deadlineOvermorrowColor" value="#d4a300" />
-              </label>
-
-              <label>
-                <span>Future</span>
-                <input type="color" name="deadlineFutureColor" value="#15803d" />
-              </label>
-
-              <label>
-                <span>No deadline</span>
-                <input type="color" name="deadlineNoneColor" value="#cbd5e1" />
-              </label>
+    <section class="classes-grid" id="classesGrid">
+      <% classes.forEach(function(classItem) { %>
+        <section class="class-card" data-class-id="<%= classItem.id %>" style="--class-bg:<%= classItem.bgColor %>;--class-text:<%= classItem.textColor %>;--class-task-bg:<%= classItem.textBgColor %>;">
+          <div class="class-card-header">
+            <div class="class-title-area">
+              <button type="button" class="drag-handle" title="Drag to reorder" aria-label="Drag class">⋮⋮</button>
+              <h2><%= classItem.name %></h2>
             </div>
-          </fieldset>
-
-          <button type="submit" class="btn">Create class</button>
-        </form>
-
-        <form id="password-form" class="class-form hidden" action="/dashboard/action" method="post">
-          <input type="hidden" name="action" value="changePassword" />
-
-          <div class="form-row">
-            <label>Current password</label>
-            <input class="text-input" type="password" name="currentPassword" placeholder="Current password" />
-          </div>
-
-          <div class="form-row">
-            <label>New password</label>
-            <input class="text-input" type="password" name="newPassword" placeholder="New password" />
-          </div>
-
-          <div class="form-row">
-            <label>Confirm new password</label>
-            <input class="text-input" type="password" name="confirmPassword" placeholder="Confirm new password" />
-          </div>
-
-          <button type="submit" class="btn">Save password</button>
-        </form>
-      </section>
-
-      <section class="classes-grid" id="classesGrid">
-        <% classes.forEach(function(classItem) { %>
-          <section
-            class="class-card"
-            data-class-id="<%= classItem.id %>"
-            style="background: <%= classItem.bgColor %>; color: <%= classItem.textColor %>;"
-          >
-            <div class="class-card-header">
-              <div class="class-title-area">
-                <button type="button" class="drag-handle" title="Drag to reorder" aria-label="Drag class">
-                  ⋮⋮
-                </button>
-
-                <h2><%= classItem.name %></h2>
-              </div>
-
-              <div class="class-card-actions">
-                <button type="button" class="btn small secondary" data-toggle-target="#edit-class-<%= classItem.id %>">
-                  Edit class
-                </button>
-
-                <form
-                  action="/dashboard/action"
-                  method="post"
-                  onsubmit="return confirm('Delete this class and all its tasks?');"
-                  class="inline-form"
-                >
-                  <input type="hidden" name="action" value="deleteClass" />
-                  <input type="hidden" name="classId" value="<%= classItem.id %>" />
-                  <button type="submit" class="btn small danger">Delete</button>
-                </form>
-              </div>
+            <div class="class-card-actions">
+              <button type="button" class="pixel-button tiny" data-toggle-target="#edit-class-<%= classItem.id %>">Edit</button>
+              <form action="/dashboard/action" method="post" class="inline-form" data-immediate-submit>
+                <input type="hidden" name="action" value="deleteClass" />
+                <input type="hidden" name="classId" value="<%= classItem.id %>" />
+                <button type="submit" class="pixel-icon-button delete-cross" aria-label="Delete class" title="Delete class">×</button>
+              </form>
             </div>
+          </div>
 
-            <div class="task-list">
-              <% if (classItem.tasks.length === 0) { %>
-                <div class="empty-state">No tasks yet. Add one below.</div>
-              <% } else { %>
-                <% classItem.tasks.forEach(function(task) { %>
-                  <div class="task-row">
-                    <div class="task-labels" data-toggle-target="#edit-task-<%= task.id %>">
-                      <span
-                        class="task-title"
-                        style="background: <%= classItem.textBgColor %>; color: <%= classItem.textColor %>;"
-                      >
-                        <%= task.title %>
-                      </span>
-
-                      <% if (task.description) { %>
-                        <div class="task-description">
-                          <%= task.description.length > 70 ? task.description.substring(0, 70) + '...' : task.description %>
-                        </div>
-                      <% } %>
-
-                      <span
-                        class="task-deadline <%= task.statusClass %>"
-                        style="background: <%= task.statusColor %>; color: <%= task.statusTextColor %>;"
-                      >
-                        <%= task.displayDate %>
-                      </span>
-                    </div>
-
-                    <div class="task-row-actions">
-                      <button type="button" class="btn tiny secondary" data-toggle-target="#edit-task-<%= task.id %>">
-                        Edit
-                      </button>
-
-                      <form
-                        action="/dashboard/action"
-                        method="post"
-                        onsubmit="return confirm('Delete this task?');"
-                        class="inline-form"
-                      >
-                        <input type="hidden" name="action" value="deleteTask" />
-                        <input type="hidden" name="classId" value="<%= classItem.id %>" />
-                        <input type="hidden" name="taskId" value="<%= task.id %>" />
-                        <button type="submit" class="btn tiny danger">Delete</button>
-                      </form>
-                    </div>
+          <div class="task-list">
+            <% if (classItem.tasks.length === 0) { %>
+              <div class="empty-state">No tasks yet.</div>
+            <% } else { %>
+              <% classItem.tasks.forEach(function(task) { %>
+                <article class="task-row" data-deadline="<%= task.deadline || '' %>">
+                  <button class="task-labels" type="button" data-toggle-target="#edit-task-<%= task.id %>">
+                    <span class="task-title"><%= task.title %></span>
+                    <% if (task.description) { %><span class="task-description"><%= task.description.length > 70 ? task.description.substring(0, 70) + '...' : task.description %></span><% } %>
+                    <span class="task-deadline <%= task.statusClass %>" style="background:<%= task.statusColor %>;color:<%= task.statusTextColor %>;"> <%= task.displayDate %> </span>
+                  </button>
+                  <div class="task-row-actions">
+                    <button type="button" class="pixel-button tiny" data-toggle-target="#edit-task-<%= task.id %>">Edit</button>
+                    <form action="/dashboard/action" method="post" class="inline-form delete-task-form" data-immediate-submit>
+                      <input type="hidden" name="action" value="deleteTask" />
+                      <input type="hidden" name="classId" value="<%= classItem.id %>" />
+                      <input type="hidden" name="taskId" value="<%= task.id %>" />
+                      <button type="submit" class="pixel-icon-button delete-cross" aria-label="Delete task" title="Delete task">×</button>
+                    </form>
                   </div>
+                </article>
+                <form id="edit-task-<%= task.id %>" class="task-edit-form hidden" action="/dashboard/action" method="post">
+                  <input type="hidden" name="action" value="updateTask" />
+                  <input type="hidden" name="classId" value="<%= classItem.id %>" />
+                  <input type="hidden" name="taskId" value="<%= task.id %>" />
+                  <div class="form-row split-row"><input class="text-input" name="taskTitle" value="<%= task.title %>" /><input class="text-input" type="date" name="taskDeadline" value="<%= task.deadline %>" /></div>
+                  <div class="form-row"><label>Description</label><textarea class="text-input description-input" name="taskDescription"><%= task.description || '' %></textarea></div>
+                  <button type="submit" class="pixel-button tiny primary">Save Task</button>
+                </form>
+              <% }); %>
+            <% } %>
+          </div>
 
-                  <form id="edit-task-<%= task.id %>" class="task-edit-form hidden" action="/dashboard/action" method="post">
-                    <input type="hidden" name="action" value="updateTask" />
-                    <input type="hidden" name="classId" value="<%= classItem.id %>" />
-                    <input type="hidden" name="taskId" value="<%= task.id %>" />
+          <button type="button" class="add-task-zone pixel-button primary">＋ Add Task</button>
+          <form class="task-add-form collapsed" action="/dashboard/action" method="post">
+            <input type="hidden" name="action" value="addTask" />
+            <input type="hidden" name="classId" value="<%= classItem.id %>" />
+            <div class="form-row split-row"><input class="text-input" name="taskTitle" placeholder="New task" /><input class="text-input" type="date" name="taskDeadline" /></div>
+            <div class="form-row"><label>Description</label><textarea class="text-input description-input" name="taskDescription" placeholder="Optional description"></textarea></div>
+            <button class="pixel-button tiny primary">Save Task</button>
+          </form>
 
-                    <div class="form-row">
-                      <input class="text-input" name="taskTitle" value="<%= task.title %>" />
-                      <input class="text-input" type="date" name="taskDeadline" value="<%= task.deadline %>" />
-                    </div>
-
-                    <div class="form-row">
-                      <label>Description</label>
-                      <textarea class="text-input description-input" name="taskDescription" placeholder="Add a description"><%= task.description || '' %></textarea>
-                    </div>
-
-                    <button type="submit" class="btn small">Save task</button>
-                  </form>
-                <% }); %>
-              <% } %>
+          <form id="edit-class-<%= classItem.id %>" class="class-form hidden" action="/dashboard/action" method="post">
+            <input type="hidden" name="action" value="updateClass" /><input type="hidden" name="classId" value="<%= classItem.id %>" />
+            <div class="form-row"><label>Class name</label><input class="text-input" name="className" value="<%= classItem.name %>" /></div>
+            <div class="form-row color-row">
+              <label><span>Background</span><input type="color" name="bgColor" value="<%= classItem.bgColor %>" /></label>
+              <label><span>Text</span><input type="color" name="textColor" value="<%= classItem.textColor %>" /></label>
+              <label><span>Text background</span><input type="color" name="textBgColor" value="<%= classItem.textBgColor %>" /></label>
             </div>
+            <fieldset class="deadline-color-editor"><legend>Deadline indicator colors</legend><div class="deadline-color-grid">
+              <label><span>Overdue</span><input type="color" name="deadlineOverdueColor" value="<%= classItem.deadlineColors.overdue %>" /></label>
+              <label><span>Today</span><input type="color" name="deadlineTodayColor" value="<%= classItem.deadlineColors.today %>" /></label>
+              <label><span>Tomorrow</span><input type="color" name="deadlineTomorrowColor" value="<%= classItem.deadlineColors.tomorrow %>" /></label>
+              <label><span>Overmorrow</span><input type="color" name="deadlineOvermorrowColor" value="<%= classItem.deadlineColors.overmorrow %>" /></label>
+              <label><span>Future</span><input type="color" name="deadlineFutureColor" value="<%= classItem.deadlineColors.future %>" /></label>
+              <label><span>No deadline</span><input type="color" name="deadlineNoneColor" value="<%= classItem.deadlineColors.none %>" /></label>
+            </div></fieldset>
+            <button class="pixel-button tiny primary">Save Class</button>
+          </form>
+        </section>
+      <% }); %>
+    </section>
+  </main>
 
-            <div class="add-task-zone" aria-hidden="true"></div>
-
-            <form class="task-add-form collapsed" action="/dashboard/action" method="post">
-              <input type="hidden" name="action" value="addTask" />
-              <input type="hidden" name="classId" value="<%= classItem.id %>" />
-
-              <div class="form-row">
-                <input class="text-input" name="taskTitle" placeholder="New task" />
-                <input class="text-input" type="date" name="taskDeadline" />
-              </div>
-
-              <div class="form-row">
-                <label>Description</label>
-                <textarea class="text-input description-input" name="taskDescription" placeholder="Optional description"></textarea>
-              </div>
-
-              <button class="btn small">Add Task</button>
-            </form>
-
-            <form id="edit-class-<%= classItem.id %>" class="class-form hidden" action="/dashboard/action" method="post">
-              <input type="hidden" name="action" value="updateClass" />
-              <input type="hidden" name="classId" value="<%= classItem.id %>" />
-
-              <div class="form-row">
-                <label>Class name</label>
-                <input class="text-input" name="className" value="<%= classItem.name %>" />
-              </div>
-
-              <div class="form-row color-row">
-                <label>
-                  <span>Background</span>
-                  <input type="color" name="bgColor" value="<%= classItem.bgColor %>" />
-                </label>
-
-                <label>
-                  <span>Text</span>
-                  <input type="color" name="textColor" value="<%= classItem.textColor %>" />
-                </label>
-
-                <label>
-                  <span>Text background</span>
-                  <input type="color" name="textBgColor" value="<%= classItem.textBgColor %>" />
-                </label>
-              </div>
-
-              <fieldset class="deadline-color-editor">
-                <legend>Deadline indicator colors</legend>
-
-                <div class="deadline-color-grid">
-                  <label>
-                    <span>Overdue</span>
-                    <input type="color" name="deadlineOverdueColor" value="<%= classItem.deadlineColors.overdue %>" />
-                  </label>
-
-                  <label>
-                    <span>Today</span>
-                    <input type="color" name="deadlineTodayColor" value="<%= classItem.deadlineColors.today %>" />
-                  </label>
-
-                  <label>
-                    <span>Tomorrow</span>
-                    <input type="color" name="deadlineTomorrowColor" value="<%= classItem.deadlineColors.tomorrow %>" />
-                  </label>
-
-                  <label>
-                    <span>Overmorrow</span>
-                    <input type="color" name="deadlineOvermorrowColor" value="<%= classItem.deadlineColors.overmorrow %>" />
-                  </label>
-
-                  <label>
-                    <span>Future</span>
-                    <input type="color" name="deadlineFutureColor" value="<%= classItem.deadlineColors.future %>" />
-                  </label>
-
-                  <label>
-                    <span>No deadline</span>
-                    <input type="color" name="deadlineNoneColor" value="<%= classItem.deadlineColors.none %>" />
-                  </label>
-                </div>
-              </fieldset>
-
-              <button class="btn small">Save class</button>
-            </form>
-          </section>
-        <% }); %>
-      </section>
-    </main>
-
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <script src="/dashboard.js"></script>
-  </body>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <script src="/dashboard.js"></script>
+</body>
 </html>

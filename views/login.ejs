@@ -1,17 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>WhatNow — Login</title>
-    <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
-    <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon_io/favicon-32x32.png?v=3">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon_io/favicon-16x16.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon_io/apple-touch-icon.png?v=3">
+  <link rel="manifest" href="/images/favicon_io/site.webmanifest?v=3">
     <link rel="stylesheet" href="/styles.css">
   </head>
 
   <body>
     <main class="page">
-      <header class="brand">WhatNow<span class="q">?</span></header>
+      <section class="login-greeting" aria-label="Jiggly welcomes you to WhatNow">
+        <div class="login-jiggly-frame">
+          <img class="login-jiggly" src="/images/jiggly.png" alt="Jiggly, the WhatNow mascot" draggable="false">
+        </div>
+        <header class="brand">WhatNow<span class="q">?</span></header>
+      </section>
 
       <section class="card login-card">
         <h2 class="card-title">Login</h2>
@@ -47,5 +55,7 @@
         </p>
       </section>
     </main>
-  </body>
+    <script src="/theme.js"></script>
+    <script src="/ui-sounds.js"></script>
+</body>
 </html>

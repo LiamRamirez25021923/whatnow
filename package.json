@@ -1,18 +1,27 @@
 {
   "name": "whatnow",
-  "version": "1.0.0",
-  "description": "",
+  "version": "2.0.0",
+  "description": "WhatNow - A pixel-themed academic task planner.",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "dev": "node app.js",
+    "check": "node --check app.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "planner",
+    "student",
+    "dashboard",
+    "productivity",
+    "pixel",
+    "task-manager"
+  ],
+  "author": "Liam Ramirez",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "dotenv": "^17.4.2",
-    "ejs": "^6.0.1",
+    "ejs": "^3.1.10",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "marked": "^18.0.6",
