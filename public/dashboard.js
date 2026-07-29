@@ -8,18 +8,25 @@
   Replace or remove it once you add Jiggly's real collection of deeply un-horse noises.
 */
 const JIGGLY_SOUNDS = [
-  '/sounds/jiggly_sfx1.mp3',
+  '/sounds/bark_fart.mp3',
   '/sounds/meow_2Tmjbru.mp3',
   '/sounds/HOO HOO.mp3',
-  '/sounds/dogtrill.mp3'
+  '/sounds/dogtrill.mp3',
+  '/sounds/ui_cackle.mp3',
+  '/sounds/slide_whistle.mp3',
+  '/sounds/oooo.mp3'
 ];
 
 /* Ordinary UI sounds. These included files can also be replaced with your own. */
 const UI_SOUNDS = {
-  click: ['/sounds/ui-click.mp3'],
-  success: ['/sounds/ui-success.mp3'],
-  delete: ['/sounds/undertale_death.m4a'],
-  drag: ['/sounds/ui_drag.m4a']
+  click: ['/sounds/ui_click.mp3'],
+  success: ['/sounds/ui_success.mp3'],
+  delete: ['/sounds/ui_delete.mp3'],
+
+  // Class drag lifecycle sounds:
+  pickup: ['/sounds/ui_drag.mp3'],
+  shuffle: ['/sounds/ui_shuffle.mp3'],
+  drop: ['/sounds/ui_drop.mp3']
 };
 
 const SOUND_SETTINGS = {
@@ -27,9 +34,20 @@ const SOUND_SETTINGS = {
   volume: 0.72
 };
 
-const audioTemplates = new Map();
-const activeAudio = new Set();
+/*
+  LOW-LATENCY SOUND ENGINE
+  ------------------------
+  Audio files are fetched and decoded into AudioBuffers during page load.
+  Playing an already-decoded buffer avoids creating a new <audio> element
+  every time a button is pressed.
+
+  Browsers still require one user gesture before audio can be unlocked.
+  The first pointer/keyboard interaction unlocks the AudioContext.
+*/
+const decodedSoundBuffers = new Map();
+const soundLoadPromises = new Map();
 let audioContext = null;
+let audioUnlocked = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   initSoundSystem();
@@ -50,86 +68,158 @@ function allConfiguredSounds() {
   ].filter(Boolean))];
 }
 
+function ensureAudioContext() {
+  if (audioContext) return audioContext;
+
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) return null;
+
+  // "interactive" asks supported browsers to prioritise low output latency.
+  try {
+    audioContext = new Context({ latencyHint: 'interactive' });
+  } catch {
+    audioContext = new Context();
+  }
+
+  return audioContext;
+}
+
+async function loadSoundBuffer(path) {
+  if (decodedSoundBuffers.has(path)) return decodedSoundBuffers.get(path);
+  if (soundLoadPromises.has(path)) return soundLoadPromises.get(path);
+
+  const context = ensureAudioContext();
+  if (!context) return null;
+
+  const promise = fetch(path, { cache: 'force-cache' })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.arrayBuffer();
+    })
+    .then((data) => context.decodeAudioData(data))
+    .then((buffer) => {
+      decodedSoundBuffers.set(path, buffer);
+      return buffer;
+    })
+    .catch((error) => {
+      console.warn(`[WhatNow audio] Could not preload ${path}:`, error);
+      return null;
+    })
+    .finally(() => {
+      soundLoadPromises.delete(path);
+    });
+
+  soundLoadPromises.set(path, promise);
+  return promise;
+}
+
 function initSoundSystem() {
+  ensureAudioContext();
+
+  // Begin downloading/decoding every configured effect immediately.
   allConfiguredSounds().forEach((path) => {
-    const audio = new Audio(path);
-    audio.preload = 'auto';
-    audio.load();
-    audioTemplates.set(path, audio);
+    loadSoundBuffer(path);
   });
 
-  // A user gesture unlocks Web Audio on browsers that restrict autoplay.
   const unlock = () => {
-    ensureAudioContext();
-    if (audioContext?.state === 'suspended') {
-      audioContext.resume().catch(() => {});
-    }
+    const context = ensureAudioContext();
+    if (!context) return;
+
+    const resume = context.state === 'suspended'
+      ? context.resume()
+      : Promise.resolve();
+
+    resume.then(() => {
+      audioUnlocked = true;
+    }).catch(() => {});
   };
 
-  document.addEventListener('pointerdown', unlock, { passive: true });
-  document.addEventListener('keydown', unlock, { passive: true });
+  // Capture phase runs before ordinary click handlers.
+  document.addEventListener('pointerdown', unlock, { capture: true, passive: true });
+  document.addEventListener('keydown', unlock, { capture: true, passive: true });
 
-  // Start normal button/link sounds on pointerdown so form navigation cannot cut
-  // the sound off before it begins. Jiggly, delete, and drag have their own sounds.
+  // Play ordinary UI feedback on pointerdown rather than click. This makes
+  // the sound begin at the start of the physical press instead of after release.
   document.addEventListener('pointerdown', (event) => {
     const control = event.target.closest('button, a, [role="button"]');
     if (!control || control.dataset.sound === 'off') return;
     if (control.id === 'jigglyButton') return;
+    if (control.classList.contains('drag-handle')) return;
+
     if (control.classList.contains('delete-cross')) {
       playRandomSound(UI_SOUNDS.delete, 'delete');
       return;
     }
-    if (control.classList.contains('drag-handle')) return;
+
     playRandomSound(UI_SOUNDS.click, 'click');
-  }, { passive: true });
+  }, { capture: true, passive: true });
 }
 
-function ensureAudioContext() {
-  if (audioContext) return audioContext;
-  const Context = window.AudioContext || window.webkitAudioContext;
-  if (!Context) return null;
-  audioContext = new Context();
-  return audioContext;
+function playDecodedBuffer(buffer, volume = SOUND_SETTINGS.volume) {
+  const context = ensureAudioContext();
+  if (!context || !buffer) return false;
+
+  const source = context.createBufferSource();
+  const gain = context.createGain();
+
+  source.buffer = buffer;
+  gain.gain.value = Math.max(0, Math.min(1, volume));
+
+  source.connect(gain);
+  gain.connect(context.destination);
+  source.start(0);
+  return true;
 }
 
 function playRandomSound(paths, fallbackType = 'click') {
   if (!SOUND_SETTINGS.enabled) return;
+
+  const context = ensureAudioContext();
+  if (!context) return;
+
+  // Resume without waiting. During a pointerdown gesture this normally happens
+  // immediately; decoded-buffer playback follows in the same event turn.
+  if (context.state === 'suspended') {
+    context.resume().then(() => {
+      audioUnlocked = true;
+    }).catch(() => {});
+  }
+
   if (!Array.isArray(paths) || paths.length === 0) {
     playSynthFallback(fallbackType);
     return;
   }
 
   const path = paths[Math.floor(Math.random() * paths.length)];
-  const template = audioTemplates.get(path) || new Audio(path);
-  const audio = template.cloneNode(true);
-  audio.volume = SOUND_SETTINGS.volume;
-  activeAudio.add(audio);
+  const buffer = decodedSoundBuffers.get(path);
 
-  const cleanUp = () => activeAudio.delete(audio);
-  audio.addEventListener('ended', cleanUp, { once: true });
-  audio.addEventListener('error', cleanUp, { once: true });
-
-  const playPromise = audio.play();
-  if (playPromise && typeof playPromise.catch === 'function') {
-    playPromise.catch((error) => {
-      console.warn(`[WhatNow audio] Could not play ${path}. Using synthesized fallback.`, error);
-      cleanUp();
-      playSynthFallback(fallbackType);
-    });
+  if (buffer) {
+    playDecodedBuffer(buffer);
+    return;
   }
+
+  // Do not wait for a network request at interaction time. Give immediate
+  // synthesized feedback, while ensuring the real file is ready next time.
+  playSynthFallback(fallbackType);
+  loadSoundBuffer(path);
 }
 
 function playSynthFallback(type = 'click') {
   const context = ensureAudioContext();
   if (!context) return;
-  if (context.state === 'suspended') context.resume().catch(() => {});
+
+  if (context.state === 'suspended') {
+    context.resume().catch(() => {});
+  }
 
   const patterns = {
-    click: [[880, 0.045], [1180, 0.045]],
-    success: [[660, 0.07], [880, 0.07], [1100, 0.09]],
-    delete: [[520, 0.07], [360, 0.07], [220, 0.07]],
-    drag: [[330, 0.06], [440, 0.06]],
-    jiggly: [[1220, 0.08], [470, 0.08], [1600, 0.08], [720, 0.08], [1040, 0.1]]
+    click: [[880, 0.035], [1180, 0.035]],
+    success: [[660, 0.055], [880, 0.055], [1100, 0.075]],
+    delete: [[520, 0.05], [350, 0.05], [210, 0.06]],
+    pickup: [[260, 0.045], [520, 0.065]],
+    shuffle: [[760, 0.025], [980, 0.03]],
+    drop: [[520, 0.045], [300, 0.075]],
+    jiggly: [[1220, 0.065], [470, 0.065], [1600, 0.065], [720, 0.065], [1040, 0.08]]
   };
 
   const pattern = patterns[type] || patterns.click;
@@ -138,15 +228,17 @@ function playSynthFallback(type = 'click') {
   pattern.forEach(([frequency, duration]) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
+
     oscillator.type = 'square';
     oscillator.frequency.setValueAtTime(frequency, start);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.12, start + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.10, start + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start(start);
-    oscillator.stop(start + duration + 0.01);
+    oscillator.stop(start + duration + 0.005);
     start += duration;
   });
 }
@@ -203,12 +295,14 @@ function initJigglyDrawer() {
 
   const artwork = button.querySelector('img');
 
+  button.addEventListener('pointerdown', () => {
+    // Sound begins on press, before the later click event toggles the drawer.
+    playRandomSound(JIGGLY_SOUNDS, 'jiggly');
+  }, { passive: true });
+
   button.addEventListener('click', () => {
     const open = drawer.classList.toggle('is-open');
 
-    // Animate the artwork rather than the whole button. This prevents the
-    // button's hover transform from cancelling the spin while the mouse rests
-    // over Jiggly.
     if (artwork) {
       artwork.classList.remove('jiggly-spin');
       void artwork.offsetWidth;
@@ -217,7 +311,6 @@ function initJigglyDrawer() {
 
     button.setAttribute('aria-expanded', String(open));
     drawer.setAttribute('aria-hidden', String(!open));
-    playRandomSound(JIGGLY_SOUNDS, 'jiggly');
   });
 
   artwork?.addEventListener('animationend', () => {
@@ -312,7 +405,6 @@ function initClassReordering() {
       if (!response.ok || !result.ok) {
         throw new Error(result.message || 'Could not save class order.');
       }
-      playRandomSound(UI_SOUNDS.drag, 'drag');
     } catch (error) {
       console.error('Could not save class order:', error);
       alert('Could not save class order. The page will reload.');
@@ -338,11 +430,27 @@ function initClassReordering() {
     preventOnFilter: false,
     onStart() {
       document.body.classList.add('is-sorting-classes');
+
+      // Play exactly once when the user successfully picks up a class.
+      playRandomSound(UI_SOUNDS.pickup, 'pickup');
     },
-    onEnd() {
+
+    onEnd(event) {
       document.body.classList.remove('is-sorting-classes');
+
+      const stayedInSamePosition = event.oldIndex === event.newIndex;
+
+      // Stay completely silent while hovering/reordering. On release, play
+      // exactly one result sound based on whether the class actually moved.
+      if (stayedInSamePosition) {
+        playRandomSound(UI_SOUNDS.drop, 'drop');
+      } else {
+        playRandomSound(UI_SOUNDS.shuffle, 'shuffle');
+      }
+
       saveClassOrder();
     },
+
     onCancel() {
       document.body.classList.remove('is-sorting-classes');
     }

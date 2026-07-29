@@ -195,3 +195,85 @@ body.is-sorting-classes { user-select:none; cursor:grabbing; }
 @keyframes loginJigglyFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-7px); } }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; animation-duration:1ms !important; animation-iteration-count:1 !important; transition-duration:1ms !important; } }
 @media (max-width:520px) { .login-jiggly-frame { width:120px; height:120px; } }
+
+
+/* =========================================================
+   JIGGLY CENTRED VERTICAL DRAWER — v2.3
+   These final rules intentionally override earlier drawer sizing.
+   ========================================================= */
+.jiggly-shell {
+  width: min(1400px, 100%);
+  margin: 34px auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.jiggly-button {
+  width: clamp(250px, 24vw, 330px);
+  height: clamp(250px, 24vw, 330px);
+  flex: 0 0 auto;
+}
+
+.jiggly-button:hover {
+  transform: translateY(-5px) scale(1.015);
+}
+
+.jiggly-button:active {
+  transform: translateY(1px) scale(.985);
+}
+
+.jiggly-drawer {
+  width: min(100%, 1100px);
+  max-width: 1100px;
+  max-height: 0;
+  padding: 0 18px;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-18px) scaleY(.97);
+  transform-origin: top center;
+  transition:
+    max-height 480ms cubic-bezier(.22, 1, .36, 1),
+    padding 360ms ease,
+    opacity 220ms ease,
+    transform 420ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.jiggly-drawer.is-open {
+  width: min(100%, 1100px);
+  max-width: 1100px;
+  max-height: 1000px;
+  padding: 20px;
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+}
+
+.drawer-calendar {
+  margin-inline: auto;
+}
+
+.drawer-actions {
+  justify-content: center;
+}
+
+@media (max-width: 760px) {
+  .jiggly-shell {
+    margin-top: 24px;
+  }
+
+  .jiggly-button {
+    width: clamp(210px, 68vw, 280px);
+    height: clamp(210px, 68vw, 280px);
+  }
+
+  .jiggly-drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .jiggly-drawer.is-open {
+    width: 100%;
+    max-width: 100%;
+  }
+}

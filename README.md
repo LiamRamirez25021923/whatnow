@@ -49,3 +49,24 @@ The Contact Us page creates a small `site_content` table automatically the first
 ## Before pushing
 
 The ZIP intentionally excludes `.env` and `node_modules`. Your real database credentials remain local and must not be pushed to GitHub. Configure the same environment variables in Render's Environment settings.
+
+
+## v2.3 sound and Jiggly revisions
+
+- Audio is preloaded and decoded with the Web Audio API for the lowest practical browser latency.
+- Button feedback starts on `pointerdown`.
+- Class dragging now has separate pickup, shuffle, and drop sounds.
+- Jiggly is approximately 3–4× larger, horizontally centred, and opens a vertical drawer beneath him.
+- `.env` is deliberately not included. Continue using your own local/Render environment variables.
+
+
+## v2.4 drag sound correction
+
+Class reordering now follows this exact sound sequence:
+
+- Pick up a class: `ui_drag.mp3` plays once.
+- Hover or swap over other classes while holding: no sound plays.
+- Release in the original position: `ui_drop.mp3` plays once.
+- Release in a different position: `ui_shuffle.mp3` plays once.
+
+The real `.env` file and `node_modules` are intentionally excluded from the push-ready ZIP.

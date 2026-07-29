@@ -1,8 +1,8 @@
 /* Shared WhatNow button sounds for pages other than the dashboard. */
 (() => {
   const sounds = {
-    click: '/sounds/ui-click.wav',
-    delete: '/sounds/ui-delete.wav'
+    click: '/sounds/ui_click.mp3',
+    delete: '/sounds/ui_delete.mp3'
   };
 
   const templates = new Map();
