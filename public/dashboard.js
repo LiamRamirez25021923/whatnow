@@ -409,29 +409,51 @@ function ensureWakeOverlay() {
   overlay.innerHTML = `
     <div class="pixel-panel wake-dialog">
       <img src="/images/jiggly.png" alt="" aria-hidden="true">
-      <h2>Waking WhatNow up…</h2>
-      <p>Render may have spun down. Your changes are still here — WhatNow will retry automatically.</p>
-      <p class="muted-text" id="wakeStatus">Connecting…</p>
+      <h2 id="wakeTitle">Saving…</h2>
+      <p id="wakeMessage">WhatNow is waiting for the server to respond.</p>
+      <p class="muted-text" id="wakeStatus">Please keep this page open.</p>
       <button class="pixel-button" type="button" id="wakeRetryButton" hidden>Try Again</button>
+      <button class="pixel-button secondary" type="button" id="wakeCloseButton" hidden>Close</button>
     </div>
   `;
   document.body.appendChild(overlay);
   return overlay;
 }
 
-function setWakeOverlay(open, text = 'Connecting…', allowRetry = false) {
+function setWakeOverlay({
+  open,
+  title = 'Saving…',
+  message = 'WhatNow is waiting for the server to respond.',
+  status = 'Please keep this page open.',
+  allowRetry = false,
+  allowClose = false
+}) {
   const overlay = ensureWakeOverlay();
   overlay.hidden = !open;
 
-  const status = overlay.querySelector('#wakeStatus');
+  const titleNode = overlay.querySelector('#wakeTitle');
+  const messageNode = overlay.querySelector('#wakeMessage');
+  const statusNode = overlay.querySelector('#wakeStatus');
   const retry = overlay.querySelector('#wakeRetryButton');
+  const close = overlay.querySelector('#wakeCloseButton');
 
-  if (status) status.textContent = text;
+  if (titleNode) titleNode.textContent = title;
+  if (messageNode) messageNode.textContent = message;
+  if (statusNode) statusNode.textContent = status;
   if (retry) retry.hidden = !allowRetry;
+  if (close) close.hidden = !allowClose;
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function getResponseMessage(response, fallback) {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    return response.json()
+      .then((body) => body && body.message ? body.message : fallback)
+      .catch(() => fallback);
+  }
+
+  return Promise.resolve(fallback);
 }
 
 async function submitFormResilient(form) {
@@ -439,76 +461,121 @@ async function submitFormResilient(form) {
   const originalText = submitter?.textContent;
   if (submitter) submitter.disabled = true;
 
-  const attempts = 4;
-  let lastError = null;
+  const targetUrl = form.getAttribute('action') || window.location.pathname;
+  const method = (form.getAttribute('method') || 'POST').toUpperCase();
 
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      if (attempt > 1) {
-        setWakeOverlay(true, `Render is waking up… retry ${attempt} of ${attempts}.`);
+  // Only show the waiting dialog when the request is noticeably slow.
+  // A healthy local/Render request normally finishes before this appears.
+  let slowTimer = setTimeout(() => {
+    setWakeOverlay({
+      open: true,
+      title: 'Still saving…',
+      message: 'WhatNow is taking longer than usual to reach the server.',
+      status: 'If Render was idle, it may be waking up. Your form is still intact.'
+    });
+  }, 1200);
+
+  try {
+    const response = await fetch(targetUrl, {
+      method,
+      body: new FormData(form),
+      credentials: 'same-origin',
+      redirect: 'follow',
+      headers: {
+        'X-WhatNow-Resilient': '1',
+        'Accept': 'application/json, text/html;q=0.9'
       }
+    });
 
-      const targetUrl = form.getAttribute('action') || window.location.pathname;
-      const method = (form.getAttribute('method') || 'POST').toUpperCase();
+    clearTimeout(slowTimer);
 
-      const response = await fetch(targetUrl, {
-        method,
-        body: new FormData(form),
-        credentials: 'same-origin',
-        redirect: 'follow',
-        headers: {
-          'X-WhatNow-Resilient': '1'
-        }
+    // IMPORTANT:
+    // Receiving an HTTP response proves that the server is awake/reachable.
+    // A 4xx/5xx is therefore an application/database error, NOT a Render sleep.
+    if (!response.ok) {
+      const message = await getResponseMessage(
+        response,
+        `WhatNow could not complete this action (HTTP ${response.status}).`
+      );
+
+      console.error('[DASHBOARD ACTION RESPONSE ERROR]', response.status, message);
+
+      setWakeOverlay({
+        open: true,
+        title: 'Could not save that change',
+        message,
+        status: 'The server responded, so this is not a Render sleep issue.',
+        allowRetry: true,
+        allowClose: true
       });
 
-      if (response.ok) {
-        // POST routes normally redirect back to dashboard/settings.
-        // Navigate only after the server confirms the action.
-        window.location.assign(response.url || '/dashboard');
-        return;
+      const retry = document.getElementById('wakeRetryButton');
+      const close = document.getElementById('wakeCloseButton');
+
+      if (retry) {
+        retry.onclick = () => {
+          setWakeOverlay({ open: false });
+          submitFormResilient(form);
+        };
       }
 
-      lastError = new Error(`Server returned ${response.status}.`);
-
-      // 4xx validation errors are real application responses, not a sleeping host.
-      if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
-        window.location.assign(response.url || '/dashboard');
-        return;
+      if (close) {
+        close.onclick = () => {
+          setWakeOverlay({ open: false });
+        };
       }
-    } catch (error) {
-      lastError = error;
+
+      form.closest('.task-row')?.classList.remove('is-completing');
+
+      if (submitter) {
+        submitter.disabled = false;
+        if (originalText != null) submitter.textContent = originalText;
+      }
+
+      return;
     }
 
-    if (attempt < attempts) {
-      setWakeOverlay(true, 'Render appears to be asleep. Waking the server and keeping your changes safe…');
-      try {
-        await fetch('/health', { cache: 'no-store', credentials: 'same-origin' });
-      } catch {}
-      await wait(2500);
+    setWakeOverlay({ open: false });
+
+    // POST handlers redirect back to the relevant page. Fetch follows that
+    // redirect, so response.url is the final destination.
+    window.location.assign(response.url || '/dashboard');
+  } catch (error) {
+    clearTimeout(slowTimer);
+
+    // fetch() only reaches this catch for an actual network-level failure,
+    // aborted connection, DNS issue, browser offline state, etc.
+    console.error('[DASHBOARD NETWORK ERROR]', error);
+
+    setWakeOverlay({
+      open: true,
+      title: 'Can’t reach WhatNow',
+      message: 'The browser could not contact the server. Your changes are still on this page.',
+      status: 'Check your connection, or wait a moment if the host is starting up.',
+      allowRetry: true,
+      allowClose: true
+    });
+
+    const retry = document.getElementById('wakeRetryButton');
+    const close = document.getElementById('wakeCloseButton');
+
+    if (retry) {
+      retry.onclick = () => {
+        setWakeOverlay({ open: false });
+        submitFormResilient(form);
+      };
     }
-  }
 
-  console.error('[RESILIENT FORM ERROR]', lastError);
-  setWakeOverlay(
-    true,
-    'WhatNow still cannot reach the server. Nothing on this page was cleared — try again when Render is available.',
-    true
-  );
+    if (close) {
+      close.onclick = () => setWakeOverlay({ open: false });
+    }
 
-  const retry = document.getElementById('wakeRetryButton');
-  if (retry) {
-    retry.onclick = () => {
-      setWakeOverlay(false);
-      submitFormResilient(form);
-    };
-  }
+    form.closest('.task-row')?.classList.remove('is-completing');
 
-  // Undo completion animation because the task was not actually changed.
-  form.closest('.task-row')?.classList.remove('is-completing');
-
-  if (submitter) {
-    submitter.disabled = false;
-    if (originalText != null) submitter.textContent = originalText;
+    if (submitter) {
+      submitter.disabled = false;
+      if (originalText != null) submitter.textContent = originalText;
+    }
   }
 }
 

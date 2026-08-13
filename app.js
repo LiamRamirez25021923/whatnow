@@ -1059,9 +1059,19 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
       stack: err.stack
     });
 
-    return res.status(503).render('service-unavailable', {
-      title: 'Your change was not lost',
-      message: 'WhatNow could not finish that dashboard action. The server may be waking up. Return to the dashboard and try again.',
+    // If JavaScript submitted this form, return a machine-readable error.
+    // The fact that this handler is running means Render/Express is already awake;
+    // do not mislabel an application/database failure as a cold start.
+    if (req.get('X-WhatNow-Resilient') === '1') {
+      return res.status(500).json({
+        ok: false,
+        message: 'WhatNow reached the server, but the dashboard action failed. Please try again. If it keeps happening, check the Render logs for [DASHBOARD ACTION ERROR].'
+      });
+    }
+
+    return res.status(500).render('service-unavailable', {
+      title: 'Could not complete that change',
+      message: 'WhatNow reached the server, but could not finish that dashboard action. Please return to the dashboard and try again.',
       returnPath: '/dashboard'
     });
   }

@@ -385,3 +385,8 @@ body.is-sorting-classes { user-select:none; cursor:grabbing; }
   .settings-card { padding:16px; }
   .settings-heading { display:grid; }
 }
+
+.wake-dialog .pixel-button.secondary {
+  margin-top: 10px;
+  opacity: .82;
+}

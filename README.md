@@ -81,3 +81,17 @@ The real `.env` file and `node_modules` are intentionally excluded from the push
   The sound system now correctly defaults to 72% volume.
 - Applied the same safe defaults and form-target handling to Settings.
 - `.env` remains excluded.
+
+
+## v2.5.2 recovery logic fix
+
+The old resilient-form code treated every HTTP 5xx response as if Render were asleep.
+That was incorrect: if Express returned an HTTP response, the service was already awake.
+
+The new behaviour:
+- fast successful requests navigate normally;
+- slow requests show a neutral "Still saving…" notice after 1.2 seconds;
+- HTTP application/database errors are shown as action errors and are not retried automatically;
+- only true `fetch()` network failures are described as inability to reach the server;
+- dashboard action failures return JSON to resilient JavaScript submissions;
+- `.env` remains excluded.
