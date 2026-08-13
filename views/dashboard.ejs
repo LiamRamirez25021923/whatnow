@@ -53,13 +53,14 @@
           <button type="button" class="pixel-button" data-toggle-target="#password-form">Change Password</button>
           <a class="pixel-button" href="/patch-notes">Patch Notes</a>
           <a class="pixel-button" href="/contact">Contact Us</a>
+          <a class="pixel-button" href="/settings">Settings</a>
           <a class="pixel-button danger" href="/logout">Log Out</a>
         </nav>
       </aside>
     </section>
 
     <section class="dashboard-tools pixel-panel">
-      <form id="new-class-form" class="class-form hidden" action="/dashboard/action" method="post">
+      <form id="new-class-form" class="class-form hidden" action="/dashboard/action" method="post" data-resilient-submit>
         <input type="hidden" name="action" value="createClass" />
         <h2>Create a class</h2>
         <div class="form-row"><label>Class name</label><input class="text-input" name="className" placeholder="Example: C327 Software App Development" /></div>
@@ -82,7 +83,7 @@
         <button type="submit" class="pixel-button primary">Create Class</button>
       </form>
 
-      <form id="password-form" class="class-form hidden" action="/dashboard/action" method="post">
+      <form id="password-form" class="class-form hidden" action="/dashboard/action" method="post" data-resilient-submit>
         <input type="hidden" name="action" value="changePassword" />
         <h2>Change password</h2>
         <div class="form-row"><label>Current password</label><input class="text-input" type="password" name="currentPassword" /></div>
@@ -102,7 +103,7 @@
             </div>
             <div class="class-card-actions">
               <button type="button" class="pixel-button tiny" data-toggle-target="#edit-class-<%= classItem.id %>">Edit</button>
-              <form action="/dashboard/action" method="post" class="inline-form" data-immediate-submit>
+              <form action="/dashboard/action" method="post" class="inline-form delete-class-form" data-resilient-submit>
                 <input type="hidden" name="action" value="deleteClass" />
                 <input type="hidden" name="classId" value="<%= classItem.id %>" />
                 <button type="submit" class="pixel-icon-button delete-cross" aria-label="Delete class" title="Delete class">×</button>
@@ -123,15 +124,15 @@
                   </button>
                   <div class="task-row-actions">
                     <button type="button" class="pixel-button tiny" data-toggle-target="#edit-task-<%= task.id %>">Edit</button>
-                    <form action="/dashboard/action" method="post" class="inline-form delete-task-form" data-immediate-submit>
-                      <input type="hidden" name="action" value="deleteTask" />
+                    <form action="/dashboard/action" method="post" class="inline-form complete-task-form" data-resilient-submit>
+                      <input type="hidden" name="action" value="completeTask" />
                       <input type="hidden" name="classId" value="<%= classItem.id %>" />
                       <input type="hidden" name="taskId" value="<%= task.id %>" />
-                      <button type="submit" class="pixel-icon-button delete-cross" aria-label="Delete task" title="Delete task">×</button>
+                      <button type="submit" class="pixel-icon-button complete-check" aria-label="Complete task" title="Mark task complete">✓</button>
                     </form>
                   </div>
                 </article>
-                <form id="edit-task-<%= task.id %>" class="task-edit-form hidden" action="/dashboard/action" method="post">
+                <form id="edit-task-<%= task.id %>" class="task-edit-form hidden" action="/dashboard/action" method="post" data-resilient-submit>
                   <input type="hidden" name="action" value="updateTask" />
                   <input type="hidden" name="classId" value="<%= classItem.id %>" />
                   <input type="hidden" name="taskId" value="<%= task.id %>" />
@@ -144,7 +145,7 @@
           </div>
 
           <button type="button" class="add-task-zone pixel-button primary">＋ Add Task</button>
-          <form class="task-add-form collapsed" action="/dashboard/action" method="post">
+          <form class="task-add-form collapsed" action="/dashboard/action" method="post" data-resilient-submit>
             <input type="hidden" name="action" value="addTask" />
             <input type="hidden" name="classId" value="<%= classItem.id %>" />
             <div class="form-row split-row"><input class="text-input" name="taskTitle" placeholder="New task" /><input class="text-input" type="date" name="taskDeadline" /></div>
@@ -152,7 +153,7 @@
             <button class="pixel-button tiny primary">Save Task</button>
           </form>
 
-          <form id="edit-class-<%= classItem.id %>" class="class-form hidden" action="/dashboard/action" method="post">
+          <form id="edit-class-<%= classItem.id %>" class="class-form hidden" action="/dashboard/action" method="post" data-resilient-submit>
             <input type="hidden" name="action" value="updateClass" /><input type="hidden" name="classId" value="<%= classItem.id %>" />
             <div class="form-row"><label>Class name</label><input class="text-input" name="className" value="<%= classItem.name %>" /></div>
             <div class="form-row color-row">

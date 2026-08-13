@@ -334,6 +334,41 @@ async function changeUserPassword(userId, currentPassword, newPassword) {
   return true;
 }
 
+
+async function changeUsername(userId, newUsername) {
+  const cleanUsername = (newUsername || '').trim();
+
+  if (!cleanUsername) {
+    return { ok: false, message: 'Username cannot be empty.' };
+  }
+
+  if (cleanUsername.length > 40) {
+    return { ok: false, message: 'Username must be 40 characters or fewer.' };
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET username = $1
+       WHERE id = $2
+       RETURNING username`,
+      [cleanUsername, userId]
+    );
+
+    if (!result.rows[0]) {
+      return { ok: false, message: 'Could not find your account.' };
+    }
+
+    return { ok: true, username: result.rows[0].username };
+  } catch (err) {
+    if (err.code === '23505') {
+      return { ok: false, message: 'That username is already taken.' };
+    }
+
+    throw err;
+  }
+}
+
 async function loadUserClasses(userId) {
   const classesResult = await pool.query(
     `SELECT id,
@@ -638,6 +673,68 @@ app.post('/login', async (req, res) => {
   }
 });
 
+
+app.get('/settings', requireLogin, (req, res) => {
+  res.render('settings', {
+    user: req.session.username,
+    error: req.query.error || null,
+    message: req.query.message || null
+  });
+});
+
+app.post('/settings/username', requireLogin, async (req, res) => {
+  try {
+    const result = await changeUsername(req.session.userId, req.body.newUsername);
+
+    if (!result.ok) {
+      return res.redirect(`/settings?error=${encodeURIComponent(result.message)}`);
+    }
+
+    req.session.username = result.username;
+    return res.redirect(`/settings?message=${encodeURIComponent('Username updated successfully.')}`);
+  } catch (err) {
+    console.error('[USERNAME CHANGE ERROR]', err);
+    return res.status(503).render('service-unavailable', {
+      title: 'Could not update username',
+      message: 'WhatNow could not reach its database. Your username was not changed.',
+      returnPath: '/settings'
+    });
+  }
+});
+
+app.post('/settings/password', requireLogin, async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.redirect(`/settings?error=${encodeURIComponent('Please fill in all password fields.')}`);
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.redirect(`/settings?error=${encodeURIComponent('New passwords do not match.')}`);
+    }
+
+    const changed = await changeUserPassword(req.session.userId, currentPassword, newPassword);
+
+    if (!changed) {
+      return res.redirect(`/settings?error=${encodeURIComponent('Current password is incorrect.')}`);
+    }
+
+    return res.redirect(`/settings?message=${encodeURIComponent('Password updated successfully.')}`);
+  } catch (err) {
+    console.error('[SETTINGS PASSWORD ERROR]', err);
+    return res.status(503).render('service-unavailable', {
+      title: 'Could not update password',
+      message: 'WhatNow could not reach its database. Your password was not changed.',
+      returnPath: '/settings'
+    });
+  }
+});
+
+// Friendly recovery for stale/cached forms that accidentally navigate to an action URL.
+app.get('/dashboard/action', requireLogin, (req, res) => res.redirect('/dashboard'));
+app.get('/action/dashboard', requireLogin, (req, res) => res.redirect('/dashboard'));
+
 app.get('/dashboard', requireLogin, async (req, res) => {
   try {
     const error = req.query.error || null;
@@ -663,7 +760,11 @@ app.get('/dashboard', requireLogin, async (req, res) => {
       stack: err.stack
     });
 
-    res.status(500).send('Could not load dashboard.');
+    res.status(503).render('service-unavailable', {
+      title: 'WhatNow is waking up',
+      message: 'The dashboard could not reach the database yet. If Render has spun down, give it a moment and try again.',
+      returnPath: '/dashboard'
+    });
   }
 });
 
@@ -896,6 +997,21 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
         break;
       }
 
+      case 'completeTask': {
+        await pool.query(
+          `DELETE FROM tasks
+           WHERE id = $1
+           AND class_id IN (
+             SELECT id
+             FROM classes
+             WHERE user_id = $2
+           )`,
+          [taskId, userId]
+        );
+
+        break;
+      }
+
       case 'deleteTask': {
         await pool.query(
           `DELETE FROM tasks
@@ -943,7 +1059,11 @@ app.post('/dashboard/action', requireLogin, async (req, res) => {
       stack: err.stack
     });
 
-    return res.status(500).send('Something went wrong while updating your dashboard.');
+    return res.status(503).render('service-unavailable', {
+      title: 'Your change was not lost',
+      message: 'WhatNow could not finish that dashboard action. The server may be waking up. Return to the dashboard and try again.',
+      returnPath: '/dashboard'
+    });
   }
 });
 
@@ -1078,6 +1198,8 @@ app.use((err, req, res, next) => {
 
   res.status(500).send('Internal Server Error - check Render logs');
 });
+
+app.get('/health', (req, res) => res.status(200).json({ ok: true }));
 
 app.listen(port, () => {
   console.log(`WhatNow app listening on port ${port}`);

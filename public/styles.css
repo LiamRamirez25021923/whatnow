@@ -277,3 +277,111 @@ body.is-sorting-classes { user-select:none; cursor:grabbing; }
     max-width: 100%;
   }
 }
+
+
+/* =========================================================
+   v2.5 — task completion, settings and Render wake recovery
+   ========================================================= */
+.complete-check {
+  color:#fff;
+  background:#42a85f;
+  border-color:#1d5e31;
+}
+.complete-check:hover {
+  background:#55bf70;
+  transform:translateY(-1px);
+}
+.task-row.is-completing {
+  opacity:0;
+  transform:translateX(18px) scale(.98);
+  transition:opacity 180ms ease, transform 180ms ease;
+}
+
+.settings-card {
+  width:min(900px,100%);
+  margin:auto;
+  padding:24px;
+}
+.settings-heading {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:18px;
+  flex-wrap:wrap;
+  margin-bottom:20px;
+}
+.settings-heading h1 { margin:.25rem 0; }
+.settings-grid {
+  display:grid;
+  gap:20px;
+}
+.sound-settings-card { align-content:start; }
+.pixel-range {
+  width:100%;
+  accent-color:var(--accent);
+  cursor:pointer;
+}
+.settings-sound-actions {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.wake-overlay {
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(20,18,25,.72);
+  backdrop-filter:blur(3px);
+}
+.wake-overlay[hidden] { display:none; }
+.wake-dialog {
+  width:min(520px,100%);
+  padding:26px;
+  text-align:center;
+  animation:wakeDialogIn 220ms ease-out;
+}
+.wake-dialog img {
+  width:100px;
+  height:100px;
+  object-fit:cover;
+  image-rendering:pixelated;
+  border-radius:50%;
+}
+@keyframes wakeDialogIn {
+  from { opacity:0; transform:translateY(10px) scale(.98); }
+  to { opacity:1; transform:none; }
+}
+
+.outage-page {
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+}
+.outage-card {
+  width:min(560px,100%);
+  padding:28px;
+  text-align:center;
+}
+.outage-jiggly {
+  width:130px;
+  height:130px;
+  object-fit:cover;
+  image-rendering:pixelated;
+  border-radius:50%;
+}
+.outage-actions {
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:22px;
+}
+
+@media (max-width:600px) {
+  .settings-card { padding:16px; }
+  .settings-heading { display:grid; }
+}

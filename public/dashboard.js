@@ -31,8 +31,21 @@ const UI_SOUNDS = {
 
 const SOUND_SETTINGS = {
   enabled: true,
-  volume: 0.72
+  volume: getStoredSfxVolume()
 };
+
+function getStoredSfxVolume() {
+  const raw = localStorage.getItem('whatnow-sfx-volume');
+
+  // A missing value must use the normal default. Number(null) === 0, which
+  // previously caused first-time users to get completely muted sound.
+  if (raw === null || raw === '') {
+    return 0.72;
+  }
+
+  const stored = Number(raw);
+  return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 0.72;
+}
 
 /*
   LOW-LATENCY SOUND ENGINE
@@ -58,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCalendar();
   initClassReordering();
   initImmediateDeleteAnimation();
+  initResilientForms();
   protectFormControlsFromDrag();
 });
 
@@ -145,6 +159,11 @@ function initSoundSystem() {
     if (!control || control.dataset.sound === 'off') return;
     if (control.id === 'jigglyButton') return;
     if (control.classList.contains('drag-handle')) return;
+
+    if (control.classList.contains('complete-check')) {
+      playRandomSound(UI_SOUNDS.success, 'success');
+      return;
+    }
 
     if (control.classList.contains('delete-cross')) {
       playRandomSound(UI_SOUNDS.delete, 'delete');
@@ -372,9 +391,132 @@ function initCalendar() {
 }
 
 function initImmediateDeleteAnimation() {
-  document.querySelectorAll('.delete-task-form').forEach((form) => {
+  document.querySelectorAll('.complete-task-form').forEach((form) => {
     form.addEventListener('submit', () => {
-      form.closest('.task-row')?.classList.add('is-deleting');
+      form.closest('.task-row')?.classList.add('is-completing');
+    });
+  });
+}
+
+function ensureWakeOverlay() {
+  let overlay = document.getElementById('wakeOverlay');
+  if (overlay) return overlay;
+
+  overlay = document.createElement('div');
+  overlay.className = 'wake-overlay';
+  overlay.id = 'wakeOverlay';
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <div class="pixel-panel wake-dialog">
+      <img src="/images/jiggly.png" alt="" aria-hidden="true">
+      <h2>Waking WhatNow up…</h2>
+      <p>Render may have spun down. Your changes are still here — WhatNow will retry automatically.</p>
+      <p class="muted-text" id="wakeStatus">Connecting…</p>
+      <button class="pixel-button" type="button" id="wakeRetryButton" hidden>Try Again</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function setWakeOverlay(open, text = 'Connecting…', allowRetry = false) {
+  const overlay = ensureWakeOverlay();
+  overlay.hidden = !open;
+
+  const status = overlay.querySelector('#wakeStatus');
+  const retry = overlay.querySelector('#wakeRetryButton');
+
+  if (status) status.textContent = text;
+  if (retry) retry.hidden = !allowRetry;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function submitFormResilient(form) {
+  const submitter = form.querySelector('[type="submit"]');
+  const originalText = submitter?.textContent;
+  if (submitter) submitter.disabled = true;
+
+  const attempts = 4;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      if (attempt > 1) {
+        setWakeOverlay(true, `Render is waking up… retry ${attempt} of ${attempts}.`);
+      }
+
+      const targetUrl = form.getAttribute('action') || window.location.pathname;
+      const method = (form.getAttribute('method') || 'POST').toUpperCase();
+
+      const response = await fetch(targetUrl, {
+        method,
+        body: new FormData(form),
+        credentials: 'same-origin',
+        redirect: 'follow',
+        headers: {
+          'X-WhatNow-Resilient': '1'
+        }
+      });
+
+      if (response.ok) {
+        // POST routes normally redirect back to dashboard/settings.
+        // Navigate only after the server confirms the action.
+        window.location.assign(response.url || '/dashboard');
+        return;
+      }
+
+      lastError = new Error(`Server returned ${response.status}.`);
+
+      // 4xx validation errors are real application responses, not a sleeping host.
+      if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+        window.location.assign(response.url || '/dashboard');
+        return;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < attempts) {
+      setWakeOverlay(true, 'Render appears to be asleep. Waking the server and keeping your changes safe…');
+      try {
+        await fetch('/health', { cache: 'no-store', credentials: 'same-origin' });
+      } catch {}
+      await wait(2500);
+    }
+  }
+
+  console.error('[RESILIENT FORM ERROR]', lastError);
+  setWakeOverlay(
+    true,
+    'WhatNow still cannot reach the server. Nothing on this page was cleared — try again when Render is available.',
+    true
+  );
+
+  const retry = document.getElementById('wakeRetryButton');
+  if (retry) {
+    retry.onclick = () => {
+      setWakeOverlay(false);
+      submitFormResilient(form);
+    };
+  }
+
+  // Undo completion animation because the task was not actually changed.
+  form.closest('.task-row')?.classList.remove('is-completing');
+
+  if (submitter) {
+    submitter.disabled = false;
+    if (originalText != null) submitter.textContent = originalText;
+  }
+}
+
+function initResilientForms() {
+  document.querySelectorAll('form[data-resilient-submit]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      submitFormResilient(form);
     });
   });
 }

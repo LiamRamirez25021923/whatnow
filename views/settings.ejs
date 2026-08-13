@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhatNow — Settings</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico?v=3">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page content-page settings-page">
+    <section class="pixel-panel settings-card">
+      <div class="settings-heading">
+        <div>
+          <p class="eyebrow">WHATNOW</p>
+          <h1>Settings</h1>
+          <p class="muted-text">Signed in as <strong><%= user %></strong></p>
+        </div>
+        <a class="pixel-button" href="/dashboard">← Dashboard</a>
+      </div>
+
+      <% if (error) { %><div class="message-banner error-banner"><%= error %></div><% } %>
+      <% if (message) { %><div class="message-banner success-banner"><%= message %></div><% } %>
+
+      <div class="settings-grid">
+        <form class="class-form" action="/settings/username" method="post" data-resilient-submit>
+          <h2>Change username</h2>
+          <div class="form-row">
+            <label for="newUsername">New username</label>
+            <input id="newUsername" class="text-input" name="newUsername" maxlength="40" value="<%= user %>" required>
+          </div>
+          <button class="pixel-button primary" type="submit">Save Username</button>
+        </form>
+
+        <form class="class-form" action="/settings/password" method="post" data-resilient-submit>
+          <h2>Change password</h2>
+          <div class="form-row"><label>Current password</label><input class="text-input" type="password" name="currentPassword" required></div>
+          <div class="form-row"><label>New password</label><input class="text-input" type="password" name="newPassword" required></div>
+          <div class="form-row"><label>Confirm new password</label><input class="text-input" type="password" name="confirmPassword" required></div>
+          <button class="pixel-button primary" type="submit">Save Password</button>
+        </form>
+
+        <section class="class-form sound-settings-card">
+          <h2>Sound effects</h2>
+          <label for="sfxVolume">Volume: <output id="sfxVolumeValue">72%</output></label>
+          <input id="sfxVolume" class="pixel-range" type="range" min="0" max="100" step="1" value="72">
+          <div class="settings-sound-actions">
+            <button id="testSfxButton" class="pixel-button" type="button">Test Sound</button>
+          </div>
+          <p class="muted-text">This setting is saved on this device and applies to WhatNow's interface sounds.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="wake-overlay" id="wakeOverlay" hidden>
+    <div class="pixel-panel wake-dialog">
+      <img src="/images/jiggly.png" alt="" aria-hidden="true">
+      <h2>Waking WhatNow up…</h2>
+      <p>Render may have spun down. Your form is still here — WhatNow will retry automatically.</p>
+      <p class="muted-text" id="wakeStatus">Connecting…</p>
+    </div>
+  </div>
+
+  <script src="/settings.js"></script>
+</body>
+</html>

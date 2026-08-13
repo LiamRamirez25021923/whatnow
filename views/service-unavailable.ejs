@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WhatNow — <%= title %></title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page outage-page">
+    <section class="pixel-panel outage-card">
+      <img class="outage-jiggly" src="/images/jiggly.png" alt="Jiggly">
+      <p class="eyebrow">WHATNOW</p>
+      <h1><%= title %></h1>
+      <p><%= message %></p>
+      <div class="outage-actions">
+        <a class="pixel-button primary" href="<%= returnPath %>">Try Again</a>
+        <a class="pixel-button" href="/">Home</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

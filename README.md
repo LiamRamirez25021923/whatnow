@@ -70,3 +70,14 @@ Class reordering now follows this exact sound sequence:
 - Release in a different position: `ui_shuffle.mp3` plays once.
 
 The real `.env` file and `node_modules` are intentionally excluded from the push-ready ZIP.
+
+
+## v2.5.1 hotfix
+
+- Fixed dashboard resilient forms navigating to `/[object HTMLInputElement]`.
+  Cause: `<input name="action">` shadows `HTMLFormElement.action` in browser DOM named-property access.
+  Fix: resilient submission now reads the literal `action` HTML attribute with `getAttribute('action')`.
+- Fixed SFX being muted on first use. A missing localStorage value (`null`) was converted to numeric `0`.
+  The sound system now correctly defaults to 72% volume.
+- Applied the same safe defaults and form-target handling to Settings.
+- `.env` remains excluded.
