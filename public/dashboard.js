@@ -478,10 +478,11 @@ async function submitFormResilient(form) {
   try {
     const response = await fetch(targetUrl, {
       method,
-      body: new FormData(form),
+      body: new URLSearchParams(new FormData(form)),
       credentials: 'same-origin',
       redirect: 'follow',
       headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
         'X-WhatNow-Resilient': '1',
         'Accept': 'application/json, text/html;q=0.9'
       }

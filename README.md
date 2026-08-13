@@ -95,3 +95,17 @@ The new behaviour:
 - only true `fetch()` network failures are described as inability to reach the server;
 - dashboard action failures return JSON to resilient JavaScript submissions;
 - `.env` remains excluded.
+
+
+## v2.5.3 request-body fix
+
+The resilient JavaScript had been submitting `FormData`, which is sent as
+`multipart/form-data`. The Express app only enables `express.urlencoded()` and
+`express.json()`, so those requests were not parsed and `req.body` was undefined.
+
+Fixed by:
+- encoding dashboard resilient forms with `URLSearchParams`;
+- encoding Settings resilient forms the same way;
+- explicitly sending `application/x-www-form-urlencoded`;
+- adding a defensive `req.body` guard in `/dashboard/action`;
+- continuing to exclude `.env`.

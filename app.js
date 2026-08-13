@@ -826,6 +826,17 @@ app.post('/classes/reorder', requireLogin, async (req, res) => {
 
 app.post('/dashboard/action', requireLogin, async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      if (req.get('X-WhatNow-Resilient') === '1') {
+        return res.status(400).json({
+          ok: false,
+          message: 'WhatNow received the request, but could not read the submitted form data.'
+        });
+      }
+
+      return res.status(400).send('Invalid form submission.');
+    }
+
     const {
       action,
       classId,
